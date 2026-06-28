@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Vector DB Advisor"
+short_description: "Advise on vector database selection, ANN algorithms, and hybrid search"

@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Harness Advisor"
+short_description: "Advise on agent harness design, scaffolding, and observability"

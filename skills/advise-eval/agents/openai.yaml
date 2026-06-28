@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Eval Advisor"
+short_description: "Advise on evaluation frameworks, metrics, and LLM-as-judge patterns"

@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Model Advisor"
+short_description: "Advise on model selection, trade-offs, and provider comparison"

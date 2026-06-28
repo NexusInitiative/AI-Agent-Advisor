@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Prompting Advisor"
+short_description: "Advise on prompt engineering, system prompt design, and few-shot techniques"

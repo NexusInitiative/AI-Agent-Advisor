@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Embedding Advisor"
+short_description: "Advise on embedding models, dimensionality, and similarity metrics"

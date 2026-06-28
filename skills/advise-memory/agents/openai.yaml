@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Memory Advisor"
+short_description: "Advise on agent memory patterns, persistent vs. session memory"

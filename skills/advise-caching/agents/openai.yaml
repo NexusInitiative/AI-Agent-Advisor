@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Caching Advisor"
+short_description: "Advise on prompt caching, semantic caching, and LLM cost reduction"

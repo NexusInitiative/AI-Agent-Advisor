@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Multi-Agent Advisor"
+short_description: "Advise on multi-agent architecture, orchestration, and handoff patterns"

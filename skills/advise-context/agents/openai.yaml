@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Context Advisor"
+short_description: "Advise on context window management, summarization, and token budgets"

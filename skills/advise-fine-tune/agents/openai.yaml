@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Fine-Tuning Advisor"
+short_description: "Advise on when and how to fine-tune, LoRA, distillation, and dataset prep"

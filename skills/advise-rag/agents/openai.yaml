@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "RAG Advisor"
+short_description: "Advise on RAG pipeline design and retrieval patterns"
