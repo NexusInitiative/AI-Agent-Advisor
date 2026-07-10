@@ -25,7 +25,7 @@ Each directory under `skills/` is a self-contained skill. When a user's question
 
 ## Skill Status
 
-All skills are currently **stubs**. See `CONTRIBUTING.md` to fill them in.
+All listed skills include advisor guidance and supporting references. See `CONTRIBUTING.md` to improve an existing skill or add a new one.
 
 ## Contributing
 

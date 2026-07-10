@@ -47,4 +47,5 @@ For eligibility, cache-key, and invalidation guidance, read [cache-policy.md](re
 
 - [OpenAI prompt caching](https://platform.openai.com/docs/guides/prompt-caching)
 - [GPTCache documentation](https://github.com/zilliztech/GPTCache)
-- [Cache replacement survey](https://arxiv.org/abs/2303.12731)
+- [SCALM: semantic caching for LLM chat services](https://arxiv.org/abs/2406.00025)
+- [GPT Semantic Cache](https://arxiv.org/abs/2411.05276)

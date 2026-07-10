@@ -49,4 +49,4 @@ For benchmark interpretation, routing criteria, and source limits, read [model-s
 
 - [OpenAI model documentation](https://platform.openai.com/docs/models)
 - [HELM benchmark](https://crfm.stanford.edu/helm/latest/)
-- [LLM routing research](https://arxiv.org/abs/2401.12973)
+- [FrugalGPT: LLM cascades and routing](https://arxiv.org/abs/2305.05176)

@@ -1,4 +1,3 @@
 allow_implicit_invocation: true
 display_name: "Evaluation Advisor"
 short_description: "Design reliable eval systems for LLM apps, RAG, and agents"
-default_prompt: "Help me design a versioned evaluation system with the right datasets, graders, calibration, CI gates, and production feedback loop."
