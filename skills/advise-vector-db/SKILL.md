@@ -39,6 +39,8 @@ For embeddings see `advise-embedding`; for RAG quality see `advise-rag`.
 
 ## Sources
 
+For index and operational evaluation criteria, read [index-selection.md](references/index-selection.md) and [source-map.md](references/source-map.md).
+
 - [ANN-Benchmarks paper](https://arxiv.org/abs/1807.05614)
 - [HNSW paper](https://arxiv.org/abs/1603.09320)
 - [pgvector documentation](https://github.com/pgvector/pgvector)

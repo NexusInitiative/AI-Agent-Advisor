@@ -41,6 +41,8 @@ For model-specific behavior, see `advise-models`; for systematic testing, see `a
 
 ## Sources
 
+For prompt-contract and structured-output details, read [prompt-contracts.md](references/prompt-contracts.md) and [source-map.md](references/source-map.md).
+
 - [OpenAI prompting guide](https://platform.openai.com/docs/guides/prompt-engineering)
 - [Prompting techniques paper](https://arxiv.org/abs/2201.11903)
 - [Structured Outputs documentation](https://platform.openai.com/docs/guides/structured-outputs)

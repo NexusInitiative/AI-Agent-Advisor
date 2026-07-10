@@ -35,6 +35,8 @@ For evaluation see `advise-eval`; for coordination see `advise-multi-agent`; for
 
 ## Sources
 
+For runtime controls and release checks, read [runtime-controls.md](references/runtime-controls.md) and [source-map.md](references/source-map.md).
+
 - [OpenAI Agents SDK tracing](https://openai.github.io/openai-agents-python/tracing/)
 - [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework)
 - [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)

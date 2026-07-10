@@ -40,6 +40,8 @@ For durable facts and shared state, see `advise-memory`; for agent runtime contr
 
 ## Sources
 
+For topology selection, handoff contracts, and boundaries, read [coordination-patterns.md](references/coordination-patterns.md) and [source-map.md](references/source-map.md).
+
 - [OpenAI Agents SDK handoffs](https://openai.github.io/openai-agents-python/handoffs/)
 - [AutoGen multi-agent framework paper](https://arxiv.org/abs/2308.08155)
 - [Multi-agent collaboration survey](https://arxiv.org/abs/2501.06322)

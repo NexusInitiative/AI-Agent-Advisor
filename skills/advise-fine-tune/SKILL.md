@@ -41,6 +41,8 @@ For evaluation design see `advise-eval`; for model choices see `advise-models`.
 
 ## Sources
 
+For adaptation selection and data-quality checks, read [adaptation-playbook.md](references/adaptation-playbook.md) and [source-map.md](references/source-map.md).
+
 - [OpenAI fine-tuning guide](https://platform.openai.com/docs/guides/fine-tuning)
 - [LoRA paper](https://arxiv.org/abs/2106.09685)
 - [QLoRA paper](https://arxiv.org/abs/2305.14314)

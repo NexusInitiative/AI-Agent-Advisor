@@ -37,6 +37,8 @@ Log token allocation, truncation, retrieval, summary version, and failures. Eval
 
 ## Sources
 
+For context budgets, compression, and ordering checks, read [context-budgeting.md](references/context-budgeting.md) and [source-map.md](references/source-map.md).
+
 - [Lost in the Middle](https://arxiv.org/abs/2307.03172)
 - [OpenAI context-window guidance](https://platform.openai.com/docs/guides/long-context)
 - [Anthropic context engineering guidance](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)

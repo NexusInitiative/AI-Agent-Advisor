@@ -38,6 +38,8 @@ For retrieval architecture see `advise-rag`; for storage/index selection see `ad
 
 ## Sources
 
+For evaluation and migration rules, read [embedding-evaluation.md](references/embedding-evaluation.md) and [source-map.md](references/source-map.md).
+
 - [MTEB paper](https://aclanthology.org/2023.eacl-main.148/)
 - [MTEB documentation](https://docs.mteb.org/)
 - [OpenAI embeddings guide](https://platform.openai.com/docs/guides/embeddings)

@@ -45,6 +45,8 @@ Do not silently substitute model aliases in production. Pin versions where the p
 
 ## Sources
 
+For benchmark interpretation, routing criteria, and source limits, read [model-selection.md](references/model-selection.md) and [source-map.md](references/source-map.md).
+
 - [OpenAI model documentation](https://platform.openai.com/docs/models)
 - [HELM benchmark](https://crfm.stanford.edu/helm/latest/)
 - [LLM routing research](https://arxiv.org/abs/2401.12973)
