@@ -1,7 +1,7 @@
 ---
 name: advise-vector-db
 description: |
-  This skill should be used when the user asks to "which vector database should I use",
+  This skill should be used when the user asks "which vector database should I use",
   "advise on vector DB", "help with vector storage", "Pinecone vs Weaviate vs pgvector",
   "how should I store my embeddings", "HNSW vs IVF", "how do I scale similarity search",
   or needs guidance on vector database selection, metadata filtering, indexing, or operational trade-offs.
