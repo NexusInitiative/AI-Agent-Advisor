@@ -11,4 +11,4 @@ The recommendations in `SKILL.md` were checked against the following primary doc
 - [JudgeBench](https://arxiv.org/abs/2410.12784): evaluates judges on difficult knowledge, reasoning, math, and coding comparisons; supports testing the judge itself rather than assuming it is reliable.
 - [Systematic study of position bias](https://arxiv.org/abs/2406.07791): motivation for order randomization and order-swapped checks in pairwise evaluation.
 
-The suggested sample sizes in `SKILL.md` (for example, 20–30 common cases or 50–100 calibration cases) are practical starting points, not statistically universal requirements. Set sample sizes from risk, variance, domain coverage, and the decision’s acceptable error rate.
+The sample sizes suggested in `SKILL.md` (for example, 20–30 common cases or 50–100 calibration cases) are practical starting points, not statistically universal requirements. Set sample sizes from risk, variance, domain coverage, and the decision’s acceptable error rate.

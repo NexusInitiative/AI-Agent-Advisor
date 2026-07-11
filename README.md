@@ -39,4 +39,4 @@ gh skill install NexusInitiative/AI-Agent-Advisor/skills/advise-rag
 
 ## Contributing
 
-Each published skill provides decision-oriented guidance and supporting references. See [CONTRIBUTING.md](CONTRIBUTING.md) to improve an existing skill or add a new one.
+All skills are complete with research-backed content and per-skill source maps. See [CONTRIBUTING.md](CONTRIBUTING.md) for the skill format, quality bar, and how to add new skills or deepen existing ones.
