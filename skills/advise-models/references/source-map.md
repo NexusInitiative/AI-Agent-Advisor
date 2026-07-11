@@ -2,5 +2,6 @@
 
 | Claim | Sources | Confidence | Scope and caveat |
 |---|---|---|---|
-| Choose with task-specific evaluation, not one leaderboard. | [S-001](https://crfm.stanford.edu/helm/), [S-002](https://platform.openai.com/docs/models) | High | HELM is comparative evidence; provider docs describe only their own product. |
-| Add routing only after a measurable baseline. | [S-003](https://arxiv.org/abs/2305.05176) | Medium | Routing gains depend on the workload and router quality. |
+| Choose models with task-specific, multi-metric evaluation rather than one leaderboard number. | [S-001](https://crfm.stanford.edu/helm/), [S-002](https://platform.openai.com/docs/models) | High | HELM is comparative evidence across scenarios; provider docs describe only their own products. |
+| Cascade/routing strategies can cut cost substantially while preserving quality on some workloads. | [S-003](https://arxiv.org/abs/2305.05176) (FrugalGPT) | Medium | Reported savings are workload-specific; gains depend on router quality and validation cost. |
+| Model capabilities, prices, and aliases are version-sensitive and change frequently. | [S-002](https://platform.openai.com/docs/models) | High | Re-check provider documentation at decision time; do not rely on numbers cached in advice. |

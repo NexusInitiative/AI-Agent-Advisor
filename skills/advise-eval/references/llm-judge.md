@@ -20,3 +20,11 @@ Sample clear passes, clear failures, borderline cases, different lengths/styles,
 For pairwise judging, randomize answer order and run order-swapped checks. A judge that changes its preference when only the position changes is not ready to gate releases. Also probe concise correct answers, verbose wrong answers, persuasive unsupported answers, and answers from the judge’s own model family.
 
 LLM judges are useful scalable graders, but human labels remain necessary for calibration and for discovering judge failure modes. Use execution checks and claim-level verification wherever a semantic judge can be replaced by an external verifier.
+
+## Judge Cost and Placement
+
+Judges are the most expensive grader class, so place them last in the grading pipeline: deterministic checks reject invalid outputs first, reference checks decide clear-cut correctness, and only surviving cases reach the judge. This ordering typically cuts judge spend severalfold and — more importantly — keeps the judge answering only the question it was calibrated for. Cache judge verdicts keyed by (case ID, output hash, judge version) so re-runs of unchanged outputs are free and historical comparisons stay stable.
+
+## When the Judge and Humans Disagree
+
+Persistent judge-human disagreement on a category is signal, not noise: either the rubric is ambiguous (fix the rubric and recalibrate), the humans disagree with each other too (fix the labeling guide), or the property genuinely requires expertise the judge lacks (route that category to human review permanently). Record which of the three it was — the pattern across categories tells you how far the judge can be trusted to expand.

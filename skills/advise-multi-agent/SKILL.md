@@ -9,39 +9,89 @@ description: |
 
 # Multi-Agent Advisor
 
-Default to one agent with tools. Add another agent only when work can be isolated by role, permissions, context, or latency and the coordination benefit exceeds extra tokens, delay, and failure modes.
+**Default to one agent with tools.** Multiple agents multiply tokens, latency, and failure modes — Anthropic's multi-agent research system reported agent workloads using roughly an order of magnitude more tokens than chat, and multi-agent topologies amplify that further. Add a second agent only when a specific, measurable boundary justifies it.
 
-## Diagnose the boundary
+## Step 1 — Diagnose Whether a Boundary Actually Exists
 
-Ask whether the task needs different expertise, conflicting permissions, independent parallel work, or a separate verification step. Keep one agent when the work shares the same context, requires frequent back-and-forth, or has a single sequential tool path. "More perspectives" alone is not a sufficient reason.
+Ask or infer. Legitimate reasons to split:
 
-## Use the smallest topology
+- **Context isolation:** one context window can't hold the working state for both roles (e.g., broad codebase exploration vs. focused implementation), and summarizing between roles is cheaper than thrashing one context.
+- **Permission separation:** roles need conflicting authority (a researcher that reads everything vs. an executor that writes narrowly) and the harness should enforce the difference (see `advise-harness`).
+- **True parallelism:** independent subtasks with no shared mutable state — parallel research questions, per-file test fixes, fan-out document processing.
+- **Independent verification:** a checker that grades a defined property with evidence or tests, kept blind to the producer's reasoning.
 
-Start with an orchestrator that owns the user goal, state, budget, and final response. Give workers a bounded objective, allowed tools, input contract, output schema, timeout, and stopping rule.
+**Not** legitimate reasons: "more perspectives," anthropomorphic org charts (PM-agent, engineer-agent, QA-agent chatting), or hoping debate improves accuracy. If the work shares context, needs tight back-and-forth, or follows one sequential tool path, keep one agent. If a single-agent baseline hasn't been measured yet, that's the next step — not architecture.
 
-- Use a **router/handoff** for clear intent categories such as language, account type, or subsystem.
-- Use **manager-worker** for decomposable plans where the manager validates each result.
-- Use **parallel workers** only for independent research, tests, or files; merge through one reviewer.
-- Use a **critic** only when it checks a defined property with evidence or tests. Avoid open-ended self-debate.
+---
 
-Pass artifacts, not conversation transcripts. A handoff should include goal, constraints, source-of-truth references, completed work, evidence, remaining risks, and a machine-readable result where possible. Put shared task state in a versioned blackboard or store; keep private scratch state private. Namespace all tenant and project state.
+## Step 2 — Use the Smallest Topology That Fits the Boundary
 
-## Make failure contained
+One orchestrator owns the user goal, budget, shared state, and final response. Workers get a bounded objective, allowed tools, an input contract, an output schema, a timeout, and a stopping rule.
 
-Treat each handoff as an untrusted boundary. Validate schemas, tool permissions, provenance, and budgets before accepting a worker result. Limit fan-out, depth, retries, token budgets, tool calls, and wall time. Require the manager to resolve conflicting answers; never have agents vote on an action that needs authorization.
+- **Router/handoff** — one agent classifies and hands the whole task to a specialist (by language, product area, subsystem). Simplest; use when categories are crisp. OpenAI's Agents SDK handoff model is a clean reference shape.
+- **Manager–worker** — the manager decomposes, dispatches bounded subtasks, validates each result, and owns the merge. The default for decomposable work.
+- **Parallel workers + one reviewer** — only for genuinely independent subtasks; all merges flow through a single reviewer/merger, never peer-to-peer reconciliation.
+- **Producer–critic** — the critic checks a *defined* property (tests pass, claims cited, policy satisfied) with evidence. Open-ended "debate" loops burn tokens and converge on confident consensus, not correctness.
 
-Trace the parent run, child run, task ID, inputs, outputs, tool calls, cost, latency, and termination reason. Evaluate end-to-end success and each boundary: routing accuracy, handoff completeness, tool safety, worker quality, merge correctness, and recovery.
+Resist deeper hierarchies until a two-level topology measurably fails. Every level adds latency, cost, and a new place for context to be lost in translation.
 
-## Decision rule
+---
 
-If a single-agent baseline misses a measurable target because of context overload, permission separation, or independent work, add one bounded worker and re-evaluate. Do not build a society of agents before this passes.
+## Step 3 — Make Handoffs Contracts, Not Conversations
 
-For durable facts and shared state, see `advise-memory`; for agent runtime controls, see `advise-harness`; for evaluation, see `advise-eval`.
+Pass artifacts, not transcripts. A handoff should contain:
 
-## Sources
+```text
+goal:            one bounded objective
+constraints:     hard requirements, budget, deadline
+inputs:          source-of-truth references (paths, IDs, URLs) — not pasted copies
+prior work:      what's done, with evidence links
+output contract: machine-readable schema for the result
+risks:           known traps the worker should avoid
+stop rule:       when to give up and return partial + reason
+```
 
-For topology selection, handoff contracts, and boundaries, read [coordination-patterns.md](references/coordination-patterns.md) and [source-map.md](references/source-map.md).
+Forwarding conversation history instead invites the worker to relitigate decisions and inherit stale context. Keep shared task state in a versioned store or blackboard the orchestrator owns; workers get private scratch space; every shared write carries provenance (which agent, from what evidence). Namespace all tenant/project state — see `advise-memory` for shared-state governance.
 
-- [OpenAI Agents SDK handoffs](https://openai.github.io/openai-agents-python/handoffs/)
-- [AutoGen multi-agent framework paper](https://arxiv.org/abs/2308.08155)
-- [Multi-agent collaboration survey](https://arxiv.org/abs/2501.06322)
+---
+
+## Step 4 — Contain Failures at Every Boundary
+
+Multi-agent error propagation is the core hazard (the coordination-mechanisms survey catalogs this well): one agent's confident mistake becomes the next agent's trusted input.
+
+- Treat each handoff as an untrusted boundary: validate output schemas, tool permissions, provenance, and budget consumption *before* the orchestrator accepts a result.
+- Enforce global limits — fan-out width, recursion depth, per-run token/tool/wall-time budgets — in the harness, not by prompt request.
+- The orchestrator resolves conflicting worker answers by evidence quality; never let agents vote on an action requiring authorization.
+- Require terminal statuses from workers (`done`, `partial`, `failed:<reason>`) so silent worker death doesn't hang the run.
+- Design for partial results: a research fan-out returning four of five branches should degrade gracefully, not abort.
+
+---
+
+## Step 5 — Trace and Evaluate Each Boundary Separately
+
+Trace parent run → child runs with task IDs, inputs, outputs, tool calls, cost, latency, and termination reason per worker (see `advise-harness` for the trace shape). Evaluate end-to-end success *and* per-boundary metrics: routing accuracy, handoff-contract completeness, worker quality on their bounded task, merge correctness, and recovery from injected worker failures. An end-to-end score alone cannot tell you whether the router, the worker, or the merge lost the run — see `advise-eval`.
+
+**Decision rule:** if the measured single-agent baseline misses target because of context overload, permission conflicts, or parallelizable independence — add *one* bounded worker, re-measure, and only then consider more. If the addition doesn't move the metric, remove it. Do not build the society of agents first.
+
+When reviewing an existing multi-agent design, apply the collapse test to each agent: "if this agent were a plain function call or tool used by its neighbor, what would break?" If the honest answer is "nothing," collapse it. Systems that survive the collapse test tend to have two or three agents with sharp boundaries, not seven with fuzzy ones.
+
+---
+
+## Common Failure Modes and Fixes
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| Costs 5–15× a single agent, quality flat | Split without a real boundary | Collapse to one agent + tools; re-measure |
+| Workers redo or contradict each other's work | Transcript handoffs, no shared task record | Artifact contracts + orchestrator-owned state |
+| One wrong claim propagates to the final answer | No validation at boundaries | Schema + provenance checks before accepting results |
+| Infinite delegation loops | No depth/fan-out limits in the harness | Hard global budgets with terminal statuses |
+| Critic approves everything | Open-ended review, no defined property | Give the critic testable criteria and evidence requirements |
+| Can't tell which agent failed | End-to-end metrics only | Per-boundary tracing and evals |
+| Race conditions on shared state | Peer-to-peer writes | Single-writer merge through the orchestrator |
+
+---
+
+## References
+
+- **Topology details, handoff schema, blackboard pattern, and containment checklist:** read [coordination-patterns.md](references/coordination-patterns.md) when designing or debugging the coordination layer.
+- **Verified sources with claims and caveats:** read [source-map.md](references/source-map.md) when citing evidence behind these recommendations.

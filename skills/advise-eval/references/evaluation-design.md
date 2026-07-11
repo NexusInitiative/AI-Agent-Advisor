@@ -40,3 +40,26 @@ evals/
 ```
 
 The layout is a starting convention, not a requirement. The important properties are versioning, reproducibility, trace retention, and diagnosable failures.
+
+## CI Wiring Example
+
+A minimal GitHub Actions gate that runs the smoke suite on every PR:
+
+```yaml
+eval-smoke:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    - run: python evals/runners/run_eval.py \
+        --dataset evals/datasets/development.jsonl \
+        --tags smoke --output results/pr.json
+    - run: python evals/runners/compare_runs.py \
+        results/baseline.json results/pr.json \
+        --gates evals/gates.yaml
+```
+
+Two properties matter more than the specific tooling: the baseline result file is pinned per main-branch commit (so comparisons are apples-to-apples), and the gates file is versioned next to the datasets so a gate change is a reviewable diff, never a dashboard edit.
+
+## Slicing Results
+
+Report every run sliced by the metadata fields in the example record — category, risk, difficulty, and source. An aggregate pass rate of 94% is uninterpretable; "policy_qa: 99%, refunds/high-risk: 71%" is a work order. Store per-case outputs with grader evidence so any regression can be diagnosed from the artifact without re-running.

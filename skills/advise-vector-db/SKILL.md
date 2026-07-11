@@ -9,38 +9,77 @@ description: |
 
 # Vector DB Advisor
 
-Choose the simplest store that satisfies measured retrieval, filtering, availability, privacy, and operational requirements. A vector database cannot fix poor chunking, embeddings, or relevance judgments; establish those first.
+Choose the simplest store that satisfies measured retrieval, filtering, availability, privacy, and operational requirements. A vector database cannot fix poor chunking, embeddings, or relevance — establish those first (`advise-rag`, `advise-embedding`). Most teams choose a vector DB before they have the query workload that would tell them which one they need.
 
-## Start with the data and query contract
+## Step 1 — Write the Data and Query Contract
 
-Ask corpus size and growth, vector dimensions, read/write rate, acceptable p95 latency, recall target, filter patterns, tenant isolation, durability, regions, backup needs, budget, and existing database expertise. Build a representative query set with required filters before selecting a product.
+Ask or infer, and write down:
 
-Use a relational database extension when vectors are modest in scale, metadata joins and transactions matter, and the team already operates the database. Use a managed vector service when operational simplicity, elasticity, or availability is more valuable than direct index tuning. Use a dedicated self-hosted engine when you need control, custom deployment, or have the operational capacity. Do not choose by vendor feature checklist alone; run a proof of concept against the real workload.
+- **Scale:** vector count now and in 18 months; dimensions; growth from re-embeds and versioning (often 2–3× the naive estimate).
+- **Traffic:** read QPS, write/update rate, batch vs. streaming ingest, acceptable p95 latency, recall target.
+- **Filters:** which metadata filters run with every query (tenant, ACL, date, type), their cardinality and selectivity. Filtered ANN behaves very differently from unfiltered — this is the most under-specified requirement in practice.
+- **Isolation & compliance:** tenant separation, per-user ACLs, residency, backup/retention.
+- **Team reality:** who operates this at 3am, and what databases do they already run well?
 
-## Choose an index deliberately
+Build a representative query set — queries *with their real filters* — before selecting anything. Product comparisons without your workload measure marketing, not fit. If the corpus is under a few hundred thousand vectors, note that now: the honest answer to "which vector DB?" at that scale is often "the database you already run, with exact search or a basic index."
 
-- Use exact/flat search for small corpora, offline evaluation, or when recall is non-negotiable and latency permits.
-- Use HNSW for strong low-latency recall when memory and build/update cost are acceptable.
-- Use IVF or compressed indexes when corpus size or memory requires a tunable recall/latency trade-off.
+---
 
-Index parameters, embedding dimension, quantization, filter selectivity, and hardware interact. Tune with recall@k and latency together; report filtered and unfiltered workloads separately. Rebuild or migrate safely when changing embedding space or index type.
+## Step 2 — Pick the Store Category (Boring Wins Ties)
 
-## Treat metadata and security as first-class
+- **Relational extension (pgvector on Postgres):** the default when vectors are up to the low millions, metadata joins and transactions matter, and the team already operates Postgres. One system of record, real ACID, mature ops. Ceiling: very large corpora and extreme QPS.
+- **Managed vector service (Pinecone-class):** when elasticity, availability SLAs, and zero index ops are worth per-vector pricing and data leaving your infra. Right for small teams scaling fast without DB expertise.
+- **Self-hosted dedicated engine (Qdrant/Weaviate/Milvus-class):** when you need index control, custom deployment, or cost control at large scale *and* have the operational capacity to run a distributed stateful system.
+- **Library-only (FAISS/hnswlib in-process):** static or rebuild-tolerant corpora, offline evaluation, single-node services. No CRUD story at scale — that's the trade.
 
-Store stable IDs, source/version, document timestamps, ownership or tenant namespace, access-control fields, and deletion state. Apply authorization filters before or inside retrieval, never after returning cross-tenant candidates. Model the filter patterns you will query; arbitrary high-cardinality filters can dominate latency or reduce approximate recall.
+Don't choose by feature checklist. Run a proof of concept on your real workload for the top two candidates; the differences that matter (filtered recall, ingest behavior, ops surprises) only show up there.
 
-Use hybrid retrieval when exact tokens, product codes, or names matter. Keep vector similarity, keyword ranking, filtering, and reranking as independently measurable stages.
+---
 
-## Validate operations
+## Step 3 — Choose and Tune the Index Deliberately
 
-Test ingest/backfill, updates, deletes, backup/restore, disaster recovery, index rebuild time, noisy-neighbor behavior, cost at growth, and cross-tenant isolation. Monitor recall samples, latency, filter error rate, index size, write backlog, and failed deletes. Never claim an ANN setting is universally best; benchmark it.
+- **Flat/exact search** for small corpora (≲ a few hundred thousand vectors, workload-dependent), offline evals, and as the recall ground truth for tuning everything else. If exact search meets latency, take it — perfect recall, zero tuning.
+- **HNSW** (Malkov & Yashunin's graph-based method) as the ANN default: strong recall/latency at the cost of memory and build/update expense. Tune `efSearch` (query-time recall/latency), `M` and `efConstruction` (build-time quality/cost).
+- **IVF, optionally with quantization (PQ/SQ):** when memory, not latency, is the binding constraint at large scale. Tune `nlist`/`nprobe`; quantization trades recall for footprint.
 
-For embeddings see `advise-embedding`; for RAG quality see `advise-rag`.
+The ANN-Benchmarks results make the operating rule clear: rankings shift with dataset, dimensionality, filters, and hardware — **never claim an index or setting is universally best; benchmark against exact-search ground truth on your vectors.** Index parameters, embedding dimension, quantization, and filter selectivity interact; tune them jointly, reporting filtered and unfiltered workloads separately.
 
-## Sources
+---
 
-For index and operational evaluation criteria, read [index-selection.md](references/index-selection.md) and [source-map.md](references/source-map.md).
+## Step 4 — Treat Metadata and Security as First-Class
 
-- [ANN-Benchmarks paper](https://arxiv.org/abs/1807.05614)
-- [HNSW paper](https://arxiv.org/abs/1603.09320)
-- [pgvector documentation](https://github.com/pgvector/pgvector)
+- Store with every vector: stable ID, source/version, document timestamp, tenant namespace, ACL fields, and deletion state.
+- **Authorization filters execute inside or before the search — never post-filter a candidate list that already crossed tenant boundaries.** Verify the engine enforces this under approximate search, then test it: similar content in two tenants, assert zero cross-retrieval.
+- Model your real filter patterns during the POC. High-cardinality or low-selectivity filters can crater approximate recall or latency depending on the engine's filtered-search implementation.
+- Use hybrid retrieval (dense + lexical) when exact tokens matter — see `advise-rag` for fusion; keep vector similarity, keyword ranking, filtering, and reranking independently measurable stages.
+
+---
+
+## Step 5 — Validate Operations Before Committing
+
+The index benchmark is the easy half. Before production, test: bulk backfill time (also your disaster-recovery time), streaming updates and deletes (tombstone behavior — deleted items must stop appearing immediately), index rebuild duration at 2× current scale, backup/restore actually executed, failover, noisy-neighbor behavior under mixed read/write load, and cost projected at 18-month scale including replicas.
+
+Monitor in production: sampled recall against exact search on a probe set, p95 latency, filter-error rate, index size and memory, write backlog, and failed deletes. Recall regressions are silent — only the probe set catches them.
+
+Finally, plan the exit before the entrance: vectors are re-derivable from source text, so the durable assets are your documents, metadata, ACLs, and IDs. Any design that makes those exportable keeps every future migration (engine, index, or embedding model) a mechanical exercise instead of a hostage negotiation.
+
+---
+
+## Common Failure Modes and Fixes
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| Great unfiltered recall, terrible with filters | Filtered-ANN implementation mismatch | Re-benchmark with real filters; tune or switch engines |
+| Cross-tenant results appear | Post-search filtering | Enforce namespace/ACL inside the search path; add the two-tenant test |
+| Deleted docs keep surfacing | Tombstones not compacted / eventual deletes | Verify delete semantics; add failed-delete monitoring |
+| Latency spikes during ingest | Index rebuilds competing with queries | Separate ingest windows or engines with incremental indexes |
+| Recall degraded slowly over months | Drift + quantization + no probe set | Sampled exact-search comparison as a standing monitor |
+| Costs 5× the estimate at scale | Replicas, dimensions, and re-embeds ignored | Re-project with the Step 1 contract; consider dimension reduction (`advise-embedding`) |
+| "Best" engine from a blog underperforms | Someone else's workload | POC on your queries, filters, and hardware |
+
+---
+
+## References
+
+- **Index parameter tuning, POC benchmark protocol, and the operations checklist:** read [index-selection.md](references/index-selection.md) when benchmarking candidates or preparing production.
+- **Verified sources with claims and caveats:** read [source-map.md](references/source-map.md) when citing evidence behind these recommendations.
