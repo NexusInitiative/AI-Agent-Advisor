@@ -39,4 +39,4 @@ gh skill install NexusInitiative/AI-Agent-Advisor/skills/advise-rag
 
 ## Contributing
 
-Skills are stubs — the goal is for the team to research and fill them in. See [CONTRIBUTING.md](CONTRIBUTING.md) for the format and how to add new skills.
+All skills are complete with research-backed content and per-skill source maps. See [CONTRIBUTING.md](CONTRIBUTING.md) for the skill format, quality bar, and how to add new skills or deepen existing ones.

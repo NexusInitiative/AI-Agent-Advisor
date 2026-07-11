@@ -25,7 +25,7 @@ Each directory under `skills/` is a self-contained skill. When a user's question
 
 ## Skill Status
 
-All skills are currently **stubs**. See `CONTRIBUTING.md` to fill them in.
+All skills are **complete**: each `SKILL.md` is a decision-oriented workflow, and each `references/` directory contains focused deep-dive files plus a `source-map.md` linking every recommendation to verified primary sources. See `CONTRIBUTING.md` to deepen a skill or add a new one.
 
 ## Contributing
 

@@ -155,7 +155,30 @@ Great skills share these traits:
 
 ---
 
-### 6. Testing Your Skill
+### 6. Source Maps — Every Claim Gets a Verified Source
+
+Each skill's `references/` directory must include a `source-map.md`: a table linking the skill's load-bearing claims to primary sources, with a confidence level and an honest caveat about scope. This is what separates researched advice from confident-sounding filler.
+
+```markdown
+# Source Map
+
+| Claim | Sources | Confidence | Scope and caveat |
+|---|---|---|---|
+| ANN is a recall/latency/resource trade-off. | [S-001](https://ann-benchmarks.com/) | High | Results depend on data, filters, and hardware. |
+```
+
+**Rules:**
+- **Verify every URL before committing.** Fetch it. Check that the page or paper is actually about what the claim says. A hallucinated or mismatched citation is worse than no citation — it launders a guess into "research."
+- Cite primary sources: original papers, official docs, first-party engineering posts. Blog summaries of papers don't count.
+- Keep the claims in `SKILL.md` consistent with the source map. If the skill body names a source, that source must appear in the map.
+- Mark time-sensitive details (pricing, model names, API limits) as version-sensitive in the caveat column, and avoid hardcoding them in the skill body at all.
+- Confidence levels: **High** = primary source directly supports the claim; **Medium** = supported but context-dependent (vendor guidance, single-workload benchmarks, surveys).
+
+CI runs `scripts/validate_skills.py` on every PR — it checks frontmatter constraints, body length, stub markers, and local link integrity. Run it locally before pushing.
+
+---
+
+### 7. Testing Your Skill
 
 Before opening a PR, validate your skill works as intended.
 

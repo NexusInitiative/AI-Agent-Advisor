@@ -1,3 +1,3 @@
 allow_implicit_invocation: true
-display_name: "Eval Advisor"
-short_description: "Advise on evaluation frameworks, metrics, and LLM-as-judge patterns"
+display_name: "Evaluation Advisor"
+short_description: "Design reliable eval systems for LLM apps, RAG, and agents"
