@@ -1,0 +1,21 @@
+{
+  "name": "ai-agent-advisor",
+  "owner": {
+    "name": "NexusInitiative"
+  },
+  "description": "Expert advice on building AI agents — covering RAG, multi-agent systems, models, evals, prompting, fine-tuning, context, memory, caching, embeddings, vector databases, and agent harnesses.",
+  "version": "1.0.0",
+  "plugins": [
+    {
+      "name": "ai-advisor",
+      "source": "./",
+      "description": "Expert advice on building AI agents",
+      "author": {
+        "name": "NexusInitiative",
+        "url": "https://github.com/NexusInitiative"
+      },
+      "repository": "https://github.com/NexusInitiative/AI-Agent-Advisor",
+      "license": "MIT"
+    }
+  ]
+}

@@ -5,7 +5,8 @@ Expert advice on building AI agents — covering the patterns, trade-offs, and t
 ## Install (Claude Code)
 
 ```
-/plugin install ai-advisor@github:NexusInitiative/AI-Agent-Advisor
+/plugin marketplace add NexusInitiative/AI-Agent-Advisor
+/plugin install ai-advisor@ai-agent-advisor
 ```
 
 ## Install (Codex)
