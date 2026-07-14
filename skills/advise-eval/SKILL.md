@@ -4,6 +4,7 @@ description: |
   This skill should be used when the user asks to "design an eval framework", "how should I test my AI agent",
   "set up LLM evaluations", "build a regression suite for my prompt", "which metrics should I use for my RAG or agent",
   "is LLM-as-a-judge reliable", "calibrate an LLM judge", "add evals to CI", "evaluate tool use or agent trajectories",
+  "design a multi-agent or ensemble judge", "detect judge bias", "monitor model drift", "is my LLM judge production-ready",
   or needs guidance on datasets, graders, human review, offline/online evaluation, safety evaluation, or production
   feedback loops for an LLM application, workflow, RAG system, or multi-agent system.
 ---
@@ -93,6 +94,8 @@ An LLM judge is a noisy measurement instrument. Before gating releases on it:
 
 Mitigate known bias by randomizing pairwise order, normalizing irrelevant formatting, requiring claim-level evidence, separating criteria, and using an independent judge family when feasible. Test the judge on adversarially persuasive but incorrect outputs and on concise correct outputs. Do not assume a stronger judge is automatically reliable: judge benchmarks show that difficult factual, reasoning, mathematical, and coding comparisons can defeat strong models.
 
+Reach for multiple judges (ensemble consensus, hierarchical routing, specialized decomposition) only when a single calibrated judge is provably insufficient — an asymmetric expensive failure, uncorrelated blind spots across model families, or high-volume monitoring where silent drift is costly. Judges of the same lineage share biases that compound rather than cancel, so redundancy only helps when the judges' errors are uncorrelated. Before a judge gates a live system for drift, it must itself be treated as a component that can drift: calibrated on production-shaped data, bias-tested and documented, reproducible/versioned, evidence-producing, uncertainty-aware, continuously monitored, and rollback-ready. Separate system drift from judge drift with a frozen human-labeled anchor set re-graded on a schedule.
+
 ## 5. Evaluate each layer and the whole system
 
 Use the layer that owns the failure:
@@ -147,6 +150,7 @@ Prefer explicit gates over one composite score. If the user asks for a tool-spec
 ## References
 
 - For detailed judge rubrics, calibration design, and bias tests, read [llm-judge.md](references/llm-judge.md).
+- For multi-agent judge patterns, bias detection, and production-readiness criteria for drift monitoring, read [multi-agent-judges.md](references/multi-agent-judges.md).
 - For dataset schemas, agent/RAG metric mapping, and CI examples, read [evaluation-design.md](references/evaluation-design.md).
 - For the verified source map and caveats, read [source-map.md](references/source-map.md).
 - For RAG-specific retrieval and generation advice, defer to `advise-rag`.
