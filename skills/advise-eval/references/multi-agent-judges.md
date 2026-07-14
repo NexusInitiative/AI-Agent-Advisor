@@ -41,7 +41,7 @@ Cost scales with judge count. Consensus also slows change: updating one judge wi
 
 ### Hierarchical routing
 
-Cases flow through tiers of increasing cost: deterministic checks → cheap model → capable model → human. Each tier decides the cases it can and escalates the rest. This is the pipeline ordering from `SKILL.md` §3 made explicit, and it is the workhorse pattern for production cost control.
+Cases flow through tiers of increasing cost: deterministic checks → cheap model → capable model → human. Each tier decides the cases it can and escalates the rest. This extends the grader-ordering principle from `SKILL.md` §3 (cheapest reliable grader first) and the cost-placement guidance in `llm-judge.md`, adding a capability cascade within the judge tier itself. It is the workhorse pattern for production cost control.
 
 ```yaml
 routing:
@@ -82,7 +82,7 @@ Keep the per-dimension verdicts and evidence separate so a failure routes to the
 
 ### Debate and critique
 
-One model produces or defends an answer; a second critiques it; a third (or a deterministic rule) adjudicates. Useful for subjective or contested judgments where surfacing the strongest counter-argument improves the decision.
+One model produces or defends an answer; a second critiques it; a third (or a deterministic rule) adjudicates. Useful for subjective or contested judgments where surfacing the strongest counter-argument improves the decision. This pattern is not covered by this skill's cited judge-reliability sources (see `references/source-map.md`); treat it as an engineering option to validate on your own calibration set, not an evidence-backed default.
 
 Treat the debate transcript as evidence to inspect, not proof — a persuasive critic can be confidently wrong, which is itself one of the biases below. Debate adds several model calls per case; reserve it for high-stakes, genuinely contestable criteria, not routine grading.
 
@@ -96,17 +96,17 @@ The single-judge biases in `llm-judge.md` do not disappear in an ensemble — a 
 | Verbosity | Rewards length independent of correctness | Score a correct answer terse vs. padded; compare equal-length answers of unequal quality |
 | Self-preference | Favors outputs from its own model family or style | Compare false-pass rate on in-family vs. out-of-family outputs |
 | Persuasion / sycophancy | Swayed by confident, well-argued but wrong answers | Include incorrect-but-persuasive and correct-but-terse cases; track false pass on them |
-| Recency / context position | Over-weights facts seen last in long context | Shuffle fact order in context and re-evaluate |
+| Recency / context position (distinct from pairwise position bias above; not covered by this skill's cited sources) | Over-weights facts seen last in a long context passed to the judge | Shuffle fact order in context and re-evaluate |
 | Domain miscalibration | Under-performs on hard math, code, or specialist facts | Benchmark the judge against experts per domain; slice failures by domain |
 | Confidence miscalibration | Stated confidence doesn't track accuracy | Compare confidence buckets to empirical accuracy on the calibration set |
 
-**Audit protocol.** Build a small adversarial probe set covering the corners: correct-terse, correct-verbose, incorrect-terse, incorrect-persuasive, correct answers from several model families, and outputs from models inside and outside the judge's lineage. Run every judge over it and report per-judge results rather than a pooled number:
+**Audit protocol.** Build a small adversarial probe set covering the corners: correct-terse, correct-verbose, incorrect-terse, incorrect-persuasive, correct answers from several model families, and outputs from models inside and outside the judge's lineage. Run every judge over it and report per-judge results rather than a pooled number. The table below is a hypothetical illustration of the report shape — substitute your own judges and measured results, not real model names or invented scores:
 
 ```text
-correct-terse   correct-verbose   incorrect-terse   incorrect-persuasive
-opus    PASS         PASS              FAIL              PASS  <- persuasion bias
-sonnet  PASS         PASS              FAIL              FAIL
-haiku   FAIL <- under-calibrated
+                correct-terse   correct-verbose   incorrect-terse   incorrect-persuasive
+judge_a (fast)  PASS            PASS              FAIL              PASS  <- flips on persuasive-wrong: persuasion bias
+judge_b (capable) PASS          PASS              FAIL              FAIL
+judge_c (fast)  FAIL            PASS              FAIL              FAIL  <- fails a correct-terse case: possibly under-calibrated
 ```
 
 A judge whose verdict flips on order swaps, or whose false-pass rate jumps on the persuasive-wrong column, is not ready to gate. Cross-judge *agreement* is its own signal: if judges agreed on calibration cases but diverge on new production traffic, suspect distribution shift or rubric ambiguity, not a broken judge.
