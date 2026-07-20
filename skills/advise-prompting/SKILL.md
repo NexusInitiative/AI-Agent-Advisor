@@ -4,7 +4,8 @@ description: |
   This skill should be used when the user asks to "advise on prompting", "help me write a better prompt",
   "improve my system prompt", "prompt engineering advice", "how do I structure my prompt",
   "why is my prompt ignored", "should I use few-shot examples", "make my model follow instructions",
-  or needs guidance on prompt design, structured output, or prompt regression testing.
+  "how do I prompt a reasoning model", "should I tell the model to think step by step",
+  or needs guidance on prompt design, structured output, reasoning-model prompting, or prompt regression testing.
 ---
 
 # Prompting Advisor
@@ -54,6 +55,8 @@ Rules for examples:
 
 For difficult reasoning, ask for a concise answer plus *verifiable* intermediate artifacts — calculations, cited quotes, tool calls, a checklist — rather than mandating hidden reasoning prose. Move facts to retrieval and math to tools; prompts should not carry what infrastructure should (see `advise-rag`, `advise-context`).
 
+**Reasoning models change the elicitation rules.** When the target is a reasoning-tuned model (OpenAI's o-series, Claude with extended thinking, and similar), drop the "think step by step" scaffolding — these models reason internally, so instructing them to narrate their reasoning is redundant and can degrade results. Give them a clear goal and explicit success criteria instead of a prescribed procedure, and start zero-shot: few-shot examples can over-constrain a reasoning model more than they help, so add them only to fix a measured gap. Everything else in this skill's contract — schema, evidence rules, failure behavior, delimiting untrusted input — still applies unchanged; only the reasoning-elicitation tactics differ. Which task actually warrants a reasoning model (versus a faster, cheaper standard model with a tight contract) is a model-selection decision — see `advise-models`.
+
 ---
 
 ## Step 4 — Test Prompts Like Code
@@ -86,6 +89,7 @@ Syntax and steering details differ by provider — see [Anthropic's prompt engin
 | "Be concise" produces chaos | Untestable adjectives | Replace with limits: "≤ 3 sentences," "one paragraph per finding" |
 | Prompt edits keep breaking other cases | No regression set | Build the set; gate edits on it |
 | Worked on old model, fails on new | Prompt validated per-model | Re-run regression set on every model change |
+| "Think step by step" on a reasoning model, quality flat or worse | Reasoning model already reasons internally | Remove CoT scaffolding; give a clear goal + success criteria, start zero-shot |
 
 ---
 

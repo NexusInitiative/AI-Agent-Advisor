@@ -186,7 +186,8 @@ Before opening a PR, validate your skill works as intended.
 Install the plugin locally and ask questions using your trigger phrases. Also ask adjacent questions that *shouldn't* activate the skill and verify they don't.
 
 ```
-/plugin install ai-advisor@github:YOUR-FORK/AI-Agent-Advisor
+/plugin marketplace add YOUR-FORK/AI-Agent-Advisor
+/plugin install ai-advisor@ai-agent-advisor
 ```
 
 Then ask:
@@ -266,12 +267,13 @@ short_description: "One sentence describing what this skill advises on"
 
 **Claude Code:**
 ```
-/plugin install ai-advisor@github:NexusInitiative/AI-Agent-Advisor
+/plugin marketplace add NexusInitiative/AI-Agent-Advisor
+/plugin install ai-advisor@ai-agent-advisor
 ```
 
-**Codex:**
+**Codex** (requires GitHub CLI v2.90.0+):
 ```
-gh skill install NexusInitiative/AI-Agent-Advisor
+gh skill install NexusInitiative/AI-Agent-Advisor --agent codex
 ```
 
 Point to your local fork during development by substituting your GitHub username.
