@@ -8,20 +8,20 @@ Each directory under `skills/` is a self-contained skill. When a user's question
 
 ## Skills Available
 
-| Skill | When to Use |
-|---|---|
-| `advise-rag` | Questions about RAG pipelines, retrieval, chunking, reranking |
-| `advise-models` | Choosing models, comparing providers, cost/quality trade-offs |
-| `advise-multi-agent` | Orchestrating agents, multi-agent patterns, handoffs |
-| `advise-eval` | Evaluation frameworks, LLM-as-judge, regression testing |
-| `advise-prompting` | Prompt engineering, system prompt design, few-shot |
-| `advise-fine-tune` | When to fine-tune, LoRA, distillation, dataset prep |
-| `advise-context` | Context window management, summarization, token budgets |
-| `advise-memory` | Agent memory patterns, persistent vs. session memory |
-| `advise-caching` | Prompt caching, semantic caching, cost reduction |
-| `advise-embedding` | Embedding models, dimensionality, similarity metrics |
-| `advise-vector-db` | Vector database selection, ANN algorithms, hybrid search |
-| `advise-harness` | Agent harness design, scaffolding, observability |
+| Skill | When to Use | Example trigger |
+|---|---|---|
+| `advise-rag` | Questions about RAG pipelines, retrieval, chunking, reranking | "my retrieval results are bad" |
+| `advise-models` | Choosing models, comparing providers, cost/quality trade-offs | "which model should I use?" |
+| `advise-multi-agent` | Orchestrating agents, multi-agent patterns, handoffs | "should I use multiple agents?" |
+| `advise-eval` | Evaluation frameworks, LLM-as-judge, regression testing | "is my LLM judge production-ready?" |
+| `advise-prompting` | Prompt engineering, system prompt design, few-shot | "why is my prompt being ignored?" |
+| `advise-fine-tune` | When to fine-tune, LoRA, distillation, dataset prep | "should I fine-tune or prompt-engineer?" |
+| `advise-context` | Context window management, summarization, token budgets | "my agent loses track mid-task" |
+| `advise-memory` | Agent memory patterns, persistent vs. session memory | "my agent keeps forgetting" |
+| `advise-caching` | Prompt caching, semantic caching, cost reduction | "reduce my API costs with caching" |
+| `advise-embedding` | Embedding models, dimensionality, similarity metrics | "what embedding model should I use?" |
+| `advise-vector-db` | Vector database selection, ANN algorithms, hybrid search | "Pinecone vs Weaviate vs pgvector?" |
+| `advise-harness` | Agent harness design, scaffolding, observability | "how do I sandbox my agent's tools?" |
 
 ## Skill Status
 
