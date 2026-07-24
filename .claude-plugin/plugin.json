@@ -1,6 +1,6 @@
 {
   "name": "ai-advisor",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Expert advice on building AI agents — covering RAG, multi-agent systems, models, evals, prompting, fine-tuning, context, memory, caching, embeddings, vector databases, and agent harnesses.",
   "author": {
     "name": "NexusInitiative",

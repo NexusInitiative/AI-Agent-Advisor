@@ -2,6 +2,14 @@
 
 This repo is a Claude Code and Codex plugin that provides expert advice on building AI agent systems. Each skill is a standalone directory under `skills/` that contributors can research and fill in independently.
 
+**Contents**
+
+- [How Skills Work](#how-skills-work)
+- [Writing a Great Skill](#writing-a-great-skill) — the core guide: trigger phrases, skill body, references, source maps, and testing
+- [Filling In a Skill](#filling-in-a-skill-quick-steps)
+- [Adding a New Skill](#adding-a-new-skill)
+- [Installing the Plugin Locally](#installing-the-plugin-locally-for-testing)
+
 ## How Skills Work
 
 When a user installs this plugin and asks a question that matches a skill's trigger phrases, the agent loads that `SKILL.md` and uses it to guide the response. The agent reads the skill body as authoritative instructions — it shapes what questions get asked, what trade-offs get surfaced, and what recommendations get made. The better the content, the better the advice.
@@ -186,7 +194,8 @@ Before opening a PR, validate your skill works as intended.
 Install the plugin locally and ask questions using your trigger phrases. Also ask adjacent questions that *shouldn't* activate the skill and verify they don't.
 
 ```
-/plugin install ai-advisor@github:YOUR-FORK/AI-Agent-Advisor
+/plugin marketplace add YOUR-FORK/AI-Agent-Advisor
+/plugin install ai-advisor@ai-agent-advisor
 ```
 
 Then ask:
@@ -266,12 +275,13 @@ short_description: "One sentence describing what this skill advises on"
 
 **Claude Code:**
 ```
-/plugin install ai-advisor@github:NexusInitiative/AI-Agent-Advisor
+/plugin marketplace add NexusInitiative/AI-Agent-Advisor
+/plugin install ai-advisor@ai-agent-advisor
 ```
 
-**Codex:**
+**Codex** (requires GitHub CLI v2.90.0+):
 ```
-gh skill install NexusInitiative/AI-Agent-Advisor
+gh skill install NexusInitiative/AI-Agent-Advisor --agent codex
 ```
 
 Point to your local fork during development by substituting your GitHub username.

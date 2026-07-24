@@ -4,7 +4,8 @@ description: |
   This skill should be used when the user asks to "which model should I use", "advise on models",
   "help me choose an LLM", "what model is best for my use case", "compare models",
   "should I use GPT or Claude", "how do I reduce model cost", "should I route requests",
-  or needs guidance on model selection, routing, quality, latency, privacy, or deployment trade-offs.
+  "should I use a reasoning model", "do I need a reasoning model for this",
+  or needs guidance on model selection, routing, reasoning vs. standard models, quality, latency, privacy, or deployment trade-offs.
 ---
 
 # Model Advisor
@@ -45,6 +46,8 @@ Then shortlist 2–3 candidates that pass the hard constraints (modalities, cont
 - **Small/fast model** when the task is narrow, well-specified, high-volume, and validated: classification, extraction, routing, summarization with fixed formats. Pair it with deterministic validation (schemas, checks) so its failures are caught cheaply.
 - **Local/self-hosted open model** when data residency, offline operation, deep customization (see `advise-fine-tune`), or predictable marginal cost at very high volume outweigh managed-service convenience. Budget for real ops: serving infrastructure, upgrades, and evals are now your job.
 - **Specialized model** (code-specific, embedding, vision) only when its advantage shows up on *your* eval, not its marketing page.
+
+**Reasoning vs. standard is a separate axis from tier.** Within a tier, decide whether the task needs a reasoning-tuned model — one that spends extra internal computation on hard, ambiguous, multi-step, or accuracy-critical work — or a standard model that is faster and cheaper on well-specified, high-throughput tasks. Reasoning models trade latency and token cost for harder-problem accuracy, so don't pay that on tasks a standard model already passes on your eval; conversely, don't starve a genuinely hard reasoning task with a standard model to save tokens. This choice also changes how you prompt the model — see `advise-prompting`.
 
 ---
 
@@ -97,6 +100,7 @@ Pin model versions where the provider allows; never let an auto-updating alias d
 | Quality dropped with no deploy | Provider alias auto-updated | Pin versions; eval on provider changelog events |
 | Provider outage took the product down | No warm fallback | Maintain tested runner-up integration and failure drills |
 | Model "fails" on grounding or permissions | Wrong layer — model score used as proxy | Fix retrieval (`advise-rag`) and authorization (`advise-harness`); models don't solve those |
+| Reasoning model slow and expensive on simple tasks | Reasoning model used where a standard one suffices | Reserve reasoning models for hard/ambiguous/accuracy-critical work; standard model for well-specified high-volume traffic |
 
 For prompt adaptation per model, see `advise-prompting`; for the measurement machinery, see `advise-eval`.
 
