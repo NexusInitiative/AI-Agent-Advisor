@@ -1,0 +1,3 @@
+allow_implicit_invocation: true
+display_name: "Debug Advisor"
+short_description: "Diagnose wrong AI answers by symptom and apply sourced fix recipes for RAG, fine-tuning, prompts, and agents"
