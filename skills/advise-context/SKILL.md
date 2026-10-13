@@ -16,7 +16,7 @@ description: |
 - **Overflow:** conversations or documents exceed the window → compression or retrieval.
 - **Distraction:** the model has the right information but ignores it → placement, structure, and pruning.
 - **Cost/latency:** token bills or response times are too high → budgeting, caching, and pruning.
-- **State loss:** a multi-step agent forgets decisions mid-task → structured state, not more transcript.
+- **State loss:** a multi-step agent forgets decisions mid-task → structured state, not more transcript. Across six tasks, tested LLMs scored 39% lower on average in multi-turn than in single-turn conversations, mostly from increased unreliability, and often did not recover after a wrong turn (Laban et al.).
 
 Also establish: typical and worst-case input sizes, how many turns a session runs, what other consumers share the window (tools, memory, retrieved docs), and whether outputs must quote or cite sources exactly.
 
@@ -26,17 +26,17 @@ Treat context as a limited working set, not a transcript bucket: every item must
 
 ## Step 2 — Set an Explicit Token Budget
 
-Write down a budget before tuning anything. A workable starting allocation for an agent with a 200k window (scale proportionally):
+Write down a budget before tuning anything. No source establishes default shares for a context window, so derive yours from measured token counts per slot:
 
-| Slot | Share | Contents |
+| Slot | Contents | Sizing rule |
 |---|---|---|
-| Stable instructions + tools | 10–15% | System prompt, tool definitions, output contracts — keep byte-stable for prompt caching |
-| Task + user input | 5–10% | Current request, user-provided facts |
-| Evidence | 30–50% | Retrieved docs, tool results, files — the elastic slot |
-| Working state | 5–10% | Decisions, constraints, open questions, artifact locations |
-| Response headroom | 15–25% | Never let evidence squeeze the answer |
+| Stable instructions + tools | System prompt, tool definitions, output contracts — keep byte-stable for prompt caching | Fixed; measure it |
+| Task + user input | Current request, user-provided facts | Measure typical and worst case |
+| Evidence | Retrieved docs, tool results, files — the elastic slot | Cap it and test whether more helps: quality first rose then fell as retrieved passages were added (Jin et al.), and reliability fell with input length even on simple tasks (Chroma's Context Rot report) |
+| Working state | Decisions, constraints, open questions, artifact locations | Keep compact and structured |
+| Response headroom | Space for the answer | Reserve what your longest required answer needs; never let evidence squeeze it |
 
-The budget makes trade-offs visible: when evidence wants more room, something must be evicted deliberately rather than by silent truncation. Log actual allocation per request so regressions show up as numbers. See [context-budgeting.md](references/context-budgeting.md) for a worked example and the state-checklist template.
+The budget makes trade-offs visible: when evidence wants more room, something must be evicted deliberately rather than by silent truncation. Log actual allocation per request so regressions show up as numbers. See [context-budgeting.md](references/context-budgeting.md) for an illustrative worked example and the state-checklist template.
 
 ---
 
@@ -90,6 +90,7 @@ Log per request: token allocation by slot, truncation events, retrieval counts, 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
 | Agent forgets decisions mid-task | State carried as prose transcript | Maintain a structured state checklist; rebuild it into every compaction |
+| Agent derails after a wrong turn in a long conversation | Early assumptions persist and compound (Laban et al.) | Checkpoint into verified structured state and test restarting from it; symptom-first recipe A3 in `advise-debug` |
 | Right document in context, wrong answer | Relevant content buried mid-context | Reorder: strongest evidence first, task reminder last |
 | Costs grow linearly with session length | No compaction checkpoints | Summarize at phase boundaries; evict superseded evidence |
 | Constraint silently dropped after summarization | Unstructured narrative summary | Use a summary schema with a constraints field; test retention |

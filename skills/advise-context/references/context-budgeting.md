@@ -4,7 +4,7 @@ Use this file when implementing a token budget, a working-state checklist, or ch
 
 ## Worked Budget Example
 
-A support agent on a 200k-token window, with tools and RAG:
+Illustrative arithmetic for one hypothetical support agent on a 200k-token window, with tools and RAG. The numbers show how to write a budget down; they are not recommendations, and no source establishes default sizes for these slots:
 
 | Slot | Budget | Notes |
 |---|---|---|
@@ -13,7 +13,7 @@ A support agent on a 200k-token window, with tools and RAG:
 | Conversation (recent turns verbatim) | 30k | Last N turns raw; older turns live in the summary |
 | Rolling summary + working state | 8k | Structured schema below |
 | Response headroom | 40k | Protects long, cited answers |
-| Slack | remainder | Absorbs spikes; alert when slack < 10% |
+| Slack | remainder | Absorbs spikes; alert when slack trends toward zero (set the threshold from observed variance) |
 
 Enforce the caps in code. When the evidence slot wants more, the assembler must evict (lowest-relevance passage first) and log the eviction — silent tail truncation is how load-bearing constraints disappear.
 

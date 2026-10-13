@@ -30,7 +30,7 @@ Updates and deletes degrade HNSW graphs over time — plan periodic rebuilds or 
 | `nprobe` | Clusters searched: recall vs. latency | Sweep 1→nlist; the knee is your setting |
 | PQ/SQ settings | Footprint vs. recall | Evaluate jointly with embedding dimension (`advise-embedding`) — losses compound |
 
-**Rule:** re-tune after any change to embedding model, dimensions, corpus size (>2×), or filter patterns. Yesterday's knee moves.
+**Rule:** re-tune after any change to embedding model, dimensions, a substantial change in corpus size, or filter patterns. Yesterday's knee moves.
 
 ## Filtered Search Notes
 

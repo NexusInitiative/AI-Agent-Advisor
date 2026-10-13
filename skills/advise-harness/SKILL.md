@@ -82,7 +82,7 @@ Budget real time for this: teams routinely spend more engineering effort on the 
 | Tool misuse with valid-looking args | Schema-only validation | Add semantic policy checks (scope, quotas, allowed targets) at the boundary |
 | Secrets appear in traces | Raw argument/result logging | Redact at the trace writer, not in the model prompt |
 
-For agent coordination across multiple agents, see `advise-multi-agent`; for cross-session state, see `advise-memory`; for measuring agent quality, see `advise-eval`.
+For agent coordination across multiple agents, see `advise-multi-agent`; for cross-session state, see `advise-memory`; for measuring agent quality, see `advise-eval`. For symptom-first diagnosis of a misbehaving run (loops, duplicate writes after timeouts, unauthorized actions from retrieved text), use `advise-debug` recipes A2, A5, and A8.
 
 ---
 

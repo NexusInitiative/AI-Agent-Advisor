@@ -157,4 +157,6 @@ For companion or game agents, use episodic memory, importance/recency ranking, s
 | Memory is too slow | Hot-path extraction | Move consolidation to background |
 | Agent over-personalizes | Too much always-in-context memory | Retrieve on demand and cap personal facts |
 
+Poisoned memory can be invisible in normal evaluation: AgentPoison reached over 80% average attack success at a poison rate below 0.1% while benign performance changed by under 1%, so keep provenance on every write. For symptom-first diagnosis of stale, wrong, or poisoned memory, use `advise-debug` recipe A7.
+
 Use [source-map.md](references/source-map.md) when citing the research behind these recommendations.

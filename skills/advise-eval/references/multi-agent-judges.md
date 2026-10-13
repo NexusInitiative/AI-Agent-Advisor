@@ -58,7 +58,7 @@ routing:
     decide: always
 ```
 
-Calibrate each tier on cases representative of *that tier's* difficulty, and log which tier decided each case. The failure mode to watch is a cheap tier that systematically misroutes, starving or flooding the expensive tier with skewed input.
+The score and confidence cutoffs in the sketch above are illustrative placeholders, not sourced recommendations; set each tier's thresholds from its calibration data against human labels. Calibrate each tier on cases representative of *that tier's* difficulty, and log which tier decided each case. The failure mode to watch is a cheap tier that systematically misroutes, starving or flooding the expensive tier with skewed input.
 
 ### Specialized decomposition
 

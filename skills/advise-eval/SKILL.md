@@ -45,7 +45,7 @@ Start with the simplest test system that can falsify the current design:
 4. Add deterministic checks before any LLM-based grading.
 5. Review failures, classify them, and add representative regressions.
 
-There is no universal required dataset size. A useful first pass is roughly 50–100 cases, but coverage and risk matter more than the count. Seed from expert-authored cases, historical traces, user feedback, previous bugs, and human-reviewed synthetic variations. Do not let synthetic data replace production-distribution coverage.
+There is no universal required dataset size, and none of the cited sources establishes one. Start with enough cases to expose the failure patterns you can already see, then size the set for the decision: treat the evaluation as an experiment, report standard errors, and compare versions as paired differences (Miller). Zero failures in `n` independent, representative trials still leaves an exact one-sided 95% upper bound of `1 − 0.05^(1/n)` on the failure probability (about 5.8% at `n = 50`, about 0.997% at `n = 299`), and curated stress cases or near-duplicate variants do not count as independent samples. Seed from expert-authored cases, historical traces, user feedback, previous bugs, and human-reviewed synthetic variations. Do not let synthetic data replace production-distribution coverage.
 
 Treat this tuple as the reproducibility key:
 
@@ -124,17 +124,19 @@ operational: p95 latency, cost, retries, and failure rate
 
 Use category-level deltas and practical/statistical significance where possible. A tiny aggregate score change should not block a release unless it represents a critical-case regression or a meaningful operational breach.
 
+Before acting on a score change, rule out the measurement. Read the transcripts of the cases whose grades changed: Anthropic reports a model's CORE-Bench score rising from 42% to 95% after rigid grading, ambiguous specifications, and irreproducible tasks were fixed, and that a 0% pass rate with frontier models is most often a signal of a broken task. Infrastructure matters too: resource limits alone moved an agentic coding benchmark by 6 percentage points. Choosing prompts, thresholds, or models repeatedly on the same dataset breaks the assumption behind standard statistical inference (Dwork et al.), so keep the release set separate from anything you tune on. For a symptom-first walkthrough (evals say fine but users disagree, or a score dropped but outputs look fine), use `advise-debug` recipes E1–E3.
+
 ## 7. Build a tiered release and production loop
 
 Start with:
 
-- **Pull request smoke suite:** 20–50 high-value cases, deterministic checks, cheap judges, and hard safety/schema gates.
+- **Pull request smoke suite:** a small set of high-value cases, deterministic checks, cheap judges, and hard safety/schema gates.
 - **Nightly/release regression:** broader development and adversarial sets, repeated runs, calibrated judges, and holdout comparison.
 - **Production monitoring:** sampled traces, safety and policy checks, latency/cost alerts, user feedback, and human review queues.
 
 Promote production failures, novel edge cases, and reviewed synthetic cases into the development set. Preserve holdout integrity. Version datasets and evaluators like code.
 
-Example gate policy:
+Example gate policy (the values are illustrative placeholders, not recommendations; derive each from the decision's acceptable error rate and the uncertainty in the estimate):
 
 ```yaml
 quality_gates:

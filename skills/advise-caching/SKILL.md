@@ -32,7 +32,7 @@ The answers determine which of the four cache layers below applies. Teams that s
 
 ## Step 2 — Take Provider Prompt Caching First (It's Nearly Free)
 
-Provider prompt caching reuses server-side computation for a repeated prompt *prefix*. It changes cost and latency, never the response content, so it is the only cache layer with essentially no correctness risk. Do this before anything else:
+Provider prompt caching reuses server-side computation for a repeated prompt *prefix*: OpenAI describes it as preserving the model's saved intermediate (key-value) states for the unchanged prefix, while new input is still processed normally, and says reuse requires the entire rendered prefix to match. Because it reuses computation rather than stored answers, it carries the least correctness risk of any cache layer, though a regression check on your own traffic is still the way to confirm that. Do this before anything else:
 
 1. **Order the prompt for stability.** Put tools, system instructions, and static reference content first; put per-request user data last. The cacheable prefix must be byte-for-byte identical between requests — a timestamp, request ID, or reordered tool list at the top silently kills every hit.
 2. **Mark cache breakpoints where the provider requires them** (e.g., Anthropic's `cache_control` blocks) or rely on automatic prefix caching where offered (e.g., OpenAI). Minimum cacheable lengths, TTLs, and pricing differ by provider and change over time — check the current [Anthropic prompt caching docs](https://platform.claude.com/docs/en/build-with-claude/prompt-caching) and [OpenAI prompt caching docs](https://platform.openai.com/docs/guides/prompt-caching) rather than hardcoding assumptions.
@@ -75,7 +75,7 @@ A semantic cache returns a stored answer when a *new* question is embedding-simi
 - Eligibility rules: only low-risk intents may hit the semantic cache; everything else bypasses.
 - Tenant/user namespace filters applied *before* similarity search.
 - Prompt-version and model matching in the key, same as exact caching.
-- A tuned similarity threshold validated on production-like traffic, measuring the **false-hit rate** (semantically close but wrong answer) — not just hit rate.
+- A tuned similarity threshold validated on production-like traffic, measuring the **false-hit rate** (semantically close but wrong answer) — not just hit rate. A single static threshold gives no formal correctness guarantee and produced unexpected error rates in the vCache study, which learns per-entry thresholds from a user-defined error bound and reported up to 26 times lower error than static thresholds.
 - Sampled audits of served hits (human or reference-based).
 - A user-visible bypass path (retry/refresh that skips the cache).
 
@@ -108,7 +108,7 @@ A high hit rate is not success if it hides important changes or serves wrong ans
 | Cache costs more than it saves | Low-hit layer on cheap/fast requests | Delete the layer; keep only measured winners |
 | Answers stay stale after content updates | TTL-only invalidation on changing data | Add event-driven eviction keyed to source versions |
 
-For deciding what belongs in the stable prefix, see `advise-context`. For measuring quality safely, see `advise-eval`.
+For deciding what belongs in the stable prefix, see `advise-context`. For measuring quality safely, see `advise-eval`. When a cache is suspected of returning the wrong answer, use `advise-debug` recipe A6.
 
 ---
 

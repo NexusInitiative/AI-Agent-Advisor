@@ -15,7 +15,7 @@ Choose the simplest store that satisfies measured retrieval, filtering, availabi
 
 Ask or infer, and write down:
 
-- **Scale:** vector count now and in 18 months; dimensions; growth from re-embeds and versioning (often 2–3× the naive estimate).
+- **Scale:** vector count now and in 18 months; dimensions; growth from re-embeds and versioning (a full re-embed into a new index temporarily holds two copies, so project it from your own re-embed plan).
 - **Traffic:** read QPS, write/update rate, batch vs. streaming ingest, acceptable p95 latency, recall target.
 - **Filters:** which metadata filters run with every query (tenant, ACL, date, type), their cardinality and selectivity. Filtered ANN behaves very differently from unfiltered — this is the most under-specified requirement in practice.
 - **Isolation & compliance:** tenant separation, per-user ACLs, residency, backup/retention.
@@ -74,7 +74,7 @@ Finally, plan the exit before the entrance: vectors are re-derivable from source
 | Deleted docs keep surfacing | Tombstones not compacted / eventual deletes | Verify delete semantics; add failed-delete monitoring |
 | Latency spikes during ingest | Index rebuilds competing with queries | Separate ingest windows or engines with incremental indexes |
 | Recall degraded slowly over months | Drift + quantization + no probe set | Sampled exact-search comparison as a standing monitor |
-| Costs 5× the estimate at scale | Replicas, dimensions, and re-embeds ignored | Re-project with the Step 1 contract; consider dimension reduction (`advise-embedding`) |
+| Cost far above the estimate at scale | Replicas, dimensions, and re-embeds ignored | Re-project with the Step 1 contract; consider dimension reduction (`advise-embedding`) |
 | "Best" engine from a blog underperforms | Someone else's workload | POC on your queries, filters, and hardware |
 
 ---

@@ -9,7 +9,7 @@ description: |
 
 # Multi-Agent Advisor
 
-**Default to one agent with tools.** Multiple agents multiply tokens, latency, and failure modes — Anthropic's multi-agent research system reported agent workloads using roughly an order of magnitude more tokens than chat, and multi-agent topologies amplify that further. Add a second agent only when a specific, measurable boundary justifies it.
+**Default to one agent with tools.** Multiple agents multiply tokens, latency, and failure modes — Anthropic reported that agents used about 4× the tokens of a chat and its multi-agent research system about 15×, and that token usage alone explained 80% of the performance variance on BrowseComp, so extra agents often buy performance by spending more. Evaluating cost alongside accuracy, Kapoor et al. found state-of-the-art agents were needlessly complex and costly. Add a second agent only when a specific, measurable boundary justifies it.
 
 ## Step 1 — Diagnose Whether a Boundary Actually Exists
 
@@ -20,7 +20,7 @@ Ask or infer. Legitimate reasons to split:
 - **True parallelism:** independent subtasks with no shared mutable state — parallel research questions, per-file test fixes, fan-out document processing.
 - **Independent verification:** a checker that grades a defined property with evidence or tests, kept blind to the producer's reasoning.
 
-**Not** legitimate reasons: "more perspectives," anthropomorphic org charts (PM-agent, engineer-agent, QA-agent chatting), or hoping debate improves accuracy. If the work shares context, needs tight back-and-forth, or follows one sequential tool path, keep one agent. If a single-agent baseline hasn't been measured yet, that's the next step — not architecture.
+**Not** legitimate reasons by themselves: "more perspectives," anthropomorphic org charts (PM-agent, engineer-agent, QA-agent chatting), or hoping debate improves accuracy. Debate raised reasoning and factuality in one study (Du et al.), but a benchmark of debate strategies found current systems did not reliably outperform self-consistency or ensembling and were sensitive to hyperparameters (Smit et al.), so measure against the cheaper baseline. If the work shares context, needs tight back-and-forth, or follows one sequential tool path, keep one agent. If a single-agent baseline hasn't been measured yet, that's the next step — not architecture.
 
 ---
 
@@ -31,7 +31,7 @@ One orchestrator owns the user goal, budget, shared state, and final response. W
 - **Router/handoff** — one agent classifies and hands the whole task to a specialist (by language, product area, subsystem). Simplest; use when categories are crisp. OpenAI's Agents SDK handoff model is a clean reference shape.
 - **Manager–worker** — the manager decomposes, dispatches bounded subtasks, validates each result, and owns the merge. The default for decomposable work.
 - **Parallel workers + one reviewer** — only for genuinely independent subtasks; all merges flow through a single reviewer/merger, never peer-to-peer reconciliation.
-- **Producer–critic** — the critic checks a *defined* property (tests pass, claims cited, policy satisfied) with evidence. Open-ended "debate" loops burn tokens and converge on confident consensus, not correctness.
+- **Producer–critic** — the critic checks a *defined* property (tests pass, claims cited, policy satisfied) with evidence. Open-ended "debate" loops cost more tokens and have not been shown to beat cheaper baselines reliably (Smit et al.).
 
 Resist deeper hierarchies until a two-level topology measurably fails. Every level adds latency, cost, and a new place for context to be lost in translation.
 
@@ -57,7 +57,7 @@ Forwarding conversation history instead invites the worker to relitigate decisio
 
 ## Step 4 — Contain Failures at Every Boundary
 
-Multi-agent error propagation is the core hazard (the coordination-mechanisms survey catalogs this well): one agent's confident mistake becomes the next agent's trusted input.
+Multi-agent error propagation is the core hazard (the coordination-mechanisms survey catalogs this well): one agent's confident mistake becomes the next agent's trusted input. The MAST analysis of 1,600+ traces across seven frameworks attributes failures to system design (41.8%), inter-agent misalignment (36.9%), and task verification (21.3%), and found that a verifier is not a silver bullet: single final-stage checks were inadequate, so verify at several levels.
 
 - Treat each handoff as an untrusted boundary: validate output schemas, tool permissions, provenance, and budget consumption *before* the orchestrator accepts a result.
 - Enforce global limits — fan-out width, recursion depth, per-run token/tool/wall-time budgets — in the harness, not by prompt request.
@@ -81,13 +81,15 @@ When reviewing an existing multi-agent design, apply the collapse test to each a
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
-| Costs 5–15× a single agent, quality flat | Split without a real boundary | Collapse to one agent + tools; re-measure |
+| Token cost many times a single agent, quality flat (Anthropic: about 4× chat tokens for an agent, about 15× for multi-agent) | Split without a real boundary | Collapse to one agent + tools; re-measure |
 | Workers redo or contradict each other's work | Transcript handoffs, no shared task record | Artifact contracts + orchestrator-owned state |
 | One wrong claim propagates to the final answer | No validation at boundaries | Schema + provenance checks before accepting results |
 | Infinite delegation loops | No depth/fan-out limits in the harness | Hard global budgets with terminal statuses |
 | Critic approves everything | Open-ended review, no defined property | Give the critic testable criteria and evidence requirements |
 | Can't tell which agent failed | End-to-end metrics only | Per-boundary tracing and evals |
 | Race conditions on shared state | Peer-to-peer writes | Single-writer merge through the orchestrator |
+
+To diagnose an existing failing run, tag its traces with the MAST failure modes (step repetition, reasoning-action mismatch, unawareness of termination, disobeyed specification, and so on) using `advise-debug` recipe A4.
 
 ---
 

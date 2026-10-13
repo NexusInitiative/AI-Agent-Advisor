@@ -6,7 +6,7 @@ Memory evals need to test the whole loop: write, manage, read, and final behavio
 
 ## Minimum Test Suite
 
-Build 30-100 realistic multi-turn or multi-session scenarios. Include:
+Build realistic multi-turn or multi-session scenarios, enough to cover each memory failure you care about and to estimate rates with a usable confidence interval (see `advise-eval`; no fixed count is established by the cited benchmarks). Include:
 
 - Stable user preference that should be remembered.
 - Preference update that should supersede the old value.

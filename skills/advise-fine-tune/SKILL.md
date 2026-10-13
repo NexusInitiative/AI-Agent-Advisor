@@ -19,7 +19,7 @@ Most fine-tuning requests are actually prompting, retrieval, or tooling problems
 - Can you label a correct answer consistently? If two of your own reviewers would disagree on the right output, you are not ready to train.
 
 **Route by gap type:**
-- Changing or long-tail *facts* → retrieval (`advise-rag`), not fine-tuning. Fine-tuning does not reliably add current knowledge and cannot cite sources.
+- Changing or long-tail *facts* → retrieval (`advise-rag`), not fine-tuning. Fine-tuning does not reliably add current knowledge and cannot cite sources: examples with facts the model did not already know were learned slowly and increased hallucination once learned (Gekhman et al., EMNLP 2024), and retrieval outperformed unsupervised fine-tuning for knowledge, by a large margin for the least popular facts (Ovadia et al.; Soudani et al.).
 - A handful of *rules or formats* → prompting and structured outputs (`advise-prompting`). Cheaper, inspectable, instantly reversible.
 - Missing *context* → context design (`advise-context`).
 - *Calculation/lookup accuracy* → tools, not weights.
@@ -46,7 +46,7 @@ If the baseline eval doesn't exist, build it first — otherwise you cannot dist
 Data quality dominates method choice. Requirements:
 
 - **Match production.** Inputs drawn from real traffic distribution; outputs exactly as you want them produced, including formatting, refusals, and edge-case handling. Include deliberate hard cases and failures from your error taxonomy.
-- **Clean ruthlessly.** Deduplicate; remove contradictory labels; fix systematic labeler disagreements before scale-up. A small clean set beats a large noisy one — hundreds to a few thousand strong examples is a realistic starting range for behavior-shaping tasks (provider guidance agrees; treat any fixed number as a starting point, not a law).
+- **Clean ruthlessly.** Deduplicate; remove contradictory labels; fix systematic labeler disagreements before scale-up. A small, carefully curated set can go a long way: LIMA taught response format and style from 1,000 curated examples, and in one data-composition study general abilities plateaued after roughly a thousand samples while math and code kept improving with more (Dong et al.). Treat any fixed number as a starting point to test, not a law.
 - **Split against leakage.** Separate train/validation/test by entity or time when the same customer, document, or template could appear on both sides. Keep a protected holdout that nobody tunes against.
 - **Synthetic data with guardrails.** Teacher-generated examples are fine for coverage, but human-review a sample, filter aggressively, and never let synthetic data crowd out production-distribution coverage.
 - **Governance.** Document provenance, licenses, and sensitive fields. Do not train on raw production conversations without privacy/legal review — training data is effectively permanent.
@@ -57,21 +57,21 @@ Data quality dominates method choice. Requirements:
 
 In escalation order:
 
-1. **Hosted supervised fine-tuning (SFT)** — when you're on a provider that offers it (e.g., [OpenAI's fine-tuning API](https://platform.openai.com/docs/guides/fine-tuning)) and the task is input→output behavior. Zero infrastructure; limited knobs.
-2. **LoRA on an open model** — the default for self-hosted adaptation. Hu et al. showed low-rank adapters can match full fine-tuning quality on many tasks while training a fraction of parameters; adapters are cheap to store, swap, and roll back.
+1. **Hosted supervised fine-tuning (SFT)** — when you're on a provider that still offers it and the task is input→output behavior. Zero infrastructure; limited knobs. Availability changes: OpenAI states it is winding down its fine-tuning platform, which is already closed to new users ([OpenAI fine-tuning guide](https://developers.openai.com/api/docs/guides/fine-tuning)), so check current provider documentation before planning around it.
+2. **LoRA on an open model** — the default for self-hosted adaptation. Hu et al. reported LoRA on par with or better than full fine-tuning on RoBERTa, DeBERTa, GPT-2, and GPT-3 while training far fewer parameters; Biderman et al. later found it substantially underperformed full fine-tuning on programming and math in standard low-rank settings while forgetting less. Adapters are cheap to store, swap, and roll back.
 3. **QLoRA** — LoRA over a quantized base (Dettmers et al.) when GPU memory is the binding constraint. Adds quantization complexity; verify quality against plain LoRA when feasible.
 4. **Distillation** — a stronger teacher generates/labels data for a smaller student; right when the goal is cost/latency at a defined task. The student must pass the same holdout as the teacher-based baseline.
 5. **Full fine-tuning** — only when you control the model, have substantial data, and measured PEFT results cannot reach the target. Highest cost, highest regression risk, hardest rollback.
 
 Preference-optimization methods (RLHF/DPO-family) are for shaping *preferences* at scale, not first-line task adaptation — exhaust SFT first.
 
-Run small experiments first: base vs. prompt-only vs. retrieval/tool baseline vs. candidate adapter, all on the same holdout. Stop training when validation stops improving; investigate errors rather than adding epochs — more epochs on a small set is the fastest route to memorization.
+Run small experiments first: base vs. prompt-only vs. retrieval/tool baseline vs. candidate adapter, all on the same holdout. Choose the stopping point with a held-out task or preference metric, not loss alone: InstructGPT's supervised models overfit on validation loss after one epoch yet more epochs improved human preference, and LIMA found perplexity did not correlate with generation quality. Memorization grows with model capacity and with how often an example is duplicated (Carlini et al.), so deduplicate (Lee et al.) and investigate errors rather than adding epochs.
 
 ---
 
 ## Step 5 — Evaluate Beyond the Target Metric, Then Ship Safely
 
-Before deploying, measure: target-task quality, the regression set (adjacent tasks, refusal behavior, jailbreak susceptibility — tuning can erode safety behavior), output-format validity, latency, and serving cost.
+Before deploying, measure: target-task quality, the regression set (adjacent tasks, refusal behavior, jailbreak susceptibility), output-format validity, latency, and serving cost. Tuning can erode safety behavior: benign utility datasets degraded safety alignment to a lesser extent than adversarial data in Qi et al., ten adversarial examples at under $0.20 jailbroke GPT-3.5 Turbo, and narrow insecure-code tuning produced broadly misaligned behavior in Betley et al. Run the safety evaluation before and after every tune and treat it as a release gate. For symptom-first diagnosis of a tuned model (overfitting, forgetting, safety erosion, train/serve template mismatch), use `advise-debug` recipes T1–T6.
 
 Ship like any risky change: version the dataset + preprocessing + base model + hyperparameters + adapter + prompt + evaluator as one unit; canary against the incumbent; keep instant rollback (adapter swap makes this trivial with LoRA); monitor drift and re-run the holdout on a schedule. Re-train on demonstrated distribution shift, not on a calendar.
 
@@ -83,8 +83,9 @@ Ship like any risky change: version the dataset + preprocessing + base model + h
 |---|---|---|
 | Great validation score, mediocre in prod | Leakage or unrepresentative data | Re-split by entity/time; sample training inputs from live traffic |
 | Model learned format but invents facts | Fine-tuning used for knowledge | Add retrieval; keep tuning for behavior only |
-| Quality regressed on everything else | Overfit narrow data; too many epochs | Fewer epochs, more diverse data, mix in general instruction data |
-| Tuned model ignores new instructions | Behavior baked in too rigidly | Retune with instruction-varied examples; keep changing rules in the prompt |
+| Quality regressed on other tasks | Catastrophic forgetting, which also occurs with LoRA | Mix in general instruction data, gate on a regression suite, compare LoRA and full tuning on retention (Luo; Kalajdzievski; Biderman) |
+| Tuned model hallucinates more | Training examples contained facts the model did not already know | Filter unknown-fact examples, stop early, move facts to retrieval (Gekhman) |
+| Safety or refusal behavior weakened | Even benign tuning can erode safety; narrow data can generalize broadly | Run a safety evaluation before and after; audit training data (Qi; Betley) |
 | Wins in eval, loses money in serving | Ignored serving cost/latency | Include p95 latency and $/request as shipping gates |
 | Can't reproduce last month's model | Untracked data/config versions | Version the full tuple; store eval snapshots with each run |
 

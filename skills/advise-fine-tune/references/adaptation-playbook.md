@@ -7,7 +7,7 @@ Use this file once fine-tuning is justified and you're choosing a method and run
 | Method | Choose when | Watch out for |
 |---|---|---|
 | Hosted SFT (provider API) | Closed model, behavior-shaping task, no infra appetite | Limited hyperparameters; data leaves your boundary — check provider data-use terms |
-| LoRA | Open model, most adaptation tasks | Rank/alpha and target-module choices matter; sweep small (r=8–64) before assuming more is better |
+| LoRA | Open model, most adaptation tasks | Rank and target-module choices matter, so sweep them instead of assuming more is better; full fine-tuning learned perturbations with ranks 10–100× higher than typical LoRA configurations, which may explain its edge on code and math (Biderman et al.) |
 | QLoRA | LoRA quality goals but GPU memory-bound | Quantization can shift quality; compare against plain LoRA on a subset when possible |
 | Distillation | Cost/latency: replace big-model calls on a defined task | Student inherits teacher errors; cap synthetic share and human-review samples |
 | Full fine-tune | You own the model, have large clean data, PEFT measurably insufficient | Catastrophic forgetting; highest rollback and regression risk |
@@ -34,9 +34,13 @@ Use this file once fine-tuning is justified and you're choosing a method and run
 
 ## Overfitting and Forgetting Signals
 
-- Validation loss improves while holdout task metric stalls → memorizing surface patterns; diversify data.
-- Output diversity collapses (identical phrasing everywhere) → too many epochs or too-narrow data.
-- Regression-set drops (safety refusals weaken, adjacent tasks degrade) → mix general instruction data back in, reduce epochs, or lower LR.
+Each signal below is paired with the evidence behind it; `advise-debug` recipes T1–T6 give the discriminating tests.
+
+- Validation loss turns upward while training loss keeps falling → the classical overfitting signal (Goodfellow et al., *Deep Learning*, section 7.8). In LLM tuning it is a signal, not an oracle: InstructGPT's SFT models overfit on validation loss after one epoch yet more epochs improved human preference, and LIMA found perplexity did not correlate with generation quality. Decide with a held-out task or preference metric.
+- Holdout task metric stalls or a freshly written matched set scores lower than the validation set → leakage or memorization (GSM1k found drops of up to 8%); deduplicate within and across splits (Lee et al.) and split by entity or time.
+- Hallucination rises after tuning → examples with facts the model did not know are fit late and raise hallucination roughly linearly (Gekhman et al.); filter them, stop early, and move facts to retrieval.
+- Output diversity collapses → preference optimization reduced diversity relative to SFT (Kirk et al.); LoRA kept generations more diverse than full fine-tuning (Biderman et al.).
+- Regression-set drops (safety refusals weaken, adjacent tasks degrade) → forgetting occurs in 1B–7B models and with LoRA, and is not removed by early stopping (Luo et al.; Kalajdzievski); mix general instruction data back in, and gate on the regression suite.
 - Format perfect, content wrong → the task needed grounding, not tuning; pair the tuned model with retrieval.
 
 ## Versioning and Rollback

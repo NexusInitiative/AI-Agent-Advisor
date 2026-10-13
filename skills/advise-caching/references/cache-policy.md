@@ -44,16 +44,16 @@ Missing dimensions cause wrong-answer reuse; superfluous dimensions only cost hi
 
 Never pick a similarity threshold by feel. Protocol:
 
-1. Collect 500–1,000 production query pairs: for each incoming query, the nearest cached query and its answer.
+1. Collect production query pairs: for each incoming query, the nearest cached query and its answer. Collect enough to bound the false-hit rate you can tolerate: with zero false hits in `n` independent labeled pairs, the exact one-sided 95% upper bound on the rate is `1 − 0.05^(1/n)` (about 5.8% at 50 pairs and about 1% at 299).
 2. Have humans (or a strong reference model with human spot-checks) label each pair: *same answer valid* / *invalid*.
-3. Sweep the threshold and plot hit rate vs. false-hit rate. Pick the threshold at your false-hit budget — for most products that budget is well under 1%, and for anything high-stakes it is zero (meaning: don't semantic-cache that traffic).
+3. Sweep the threshold and plot hit rate vs. false-hit rate. Pick the threshold at a false-hit budget set by the cost of one wrong answer, and for anything high-stakes treat the budget as zero (meaning: don't semantic-cache that traffic). A single static threshold gives no formal guarantee; vCache instead learns a per-entry threshold from a user-defined error bound.
 4. Re-run the sweep whenever the embedding model, prompt version, or traffic mix changes.
 
 Threshold alone is insufficient — combine with the eligibility allowlist, namespace filters applied before similarity search, and exact matching on prompt/model versions.
 
 ## Ongoing Audit
 
-- Sample 1–5% of semantic-cache hits into a review queue; label validity weekly.
+- Sample semantic-cache hits continuously into a review queue and label their validity on a regular cadence; size the sample so the false-hit estimate has a usable confidence interval (see the exact-bound note above).
 - Alert on hit-rate cliffs (prefix broke) and hit-rate spikes (threshold or eligibility bug).
 - Log the cache layer that served every response so incidents can be traced to a layer in one query.
 - Re-verify provider prompt-cache behavior (minimum lengths, TTLs, pricing) after provider announcements; treat those parameters as version-sensitive, per the source map.

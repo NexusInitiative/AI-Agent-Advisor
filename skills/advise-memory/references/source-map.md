@@ -20,6 +20,8 @@ Use this reference when citing research or explaining why the skill recommends a
 - MemoryBank: demonstrates companion-style long-term memory with importance, reinforcement, and forgetting/decay inspired by the Ebbinghaus curve. Use carefully; decay is a ranking tool, not a substitute for user controls. https://arxiv.org/abs/2305.10250
 - LongMemEval: benchmark for long-term chat memory covering information extraction, multi-session reasoning, temporal reasoning, knowledge updates, and abstention. https://arxiv.org/abs/2410.10813
 - LoCoMo / Evaluating Very Long-Term Conversational Memory: benchmark for long-term conversations across many sessions, temporal/causal dynamics, summarization, and QA. https://arxiv.org/abs/2402.17753
+- AgentPoison: poisoning an agent's long-term memory or RAG knowledge base reached over 80% average attack success at a poison rate below 0.1% with under 1% change in benign performance, so poisoned memory can be invisible in ordinary evaluation. Preprint; three agent types; attack under the paper's threat model. https://arxiv.org/abs/2407.12784
+- Sample sizes: no fixed number of evaluation scenarios is established by the sources above; size the set from the failures you must cover and the confidence interval you need (Adding Error Bars to Evals, https://arxiv.org/abs/2411.00640).
 
 ## How To Cite In Answers
 
