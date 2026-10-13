@@ -40,28 +40,24 @@ Keep the system layer byte-stable (prompt caching); everything volatile goes aft
 
 - Wrap each evidence item in tags with stable IDs (`DOC-1`) so citations survive reordering.
 - State the data-not-instructions rule in the system layer *and* keep it near the evidence for long contexts.
-- For tool outputs, prefer structured results (JSON) over prose — harder to hide injected directives in.
+- For tool outputs, use typed records when they clarify fields, provenance, and validation. Injected directives can still appear in JSON strings; structure alone is not a security boundary.
 - Delimiting is necessary but not sufficient: real injection defense also lives in the harness (tool permissions, validation) — see `advise-harness`.
 
 ## Example-Selection Rules
 
 1. Add examples only after a regression case proves clear instructions didn't fix the gap.
-2. 1–3 examples; one per decision boundary you're teaching. More near-duplicates add tokens, not signal.
+2. Choose distinct examples for the decision boundaries the model misses. Compare example counts against zero-shot; there is no universal optimum.
 3. Draw from real (sanitized) inputs; idealized examples teach the model a distribution that doesn't exist.
 4. Include the unhappy path if it matters: one abstention or refusal example anchors that behavior better than a paragraph of rules.
 5. Audit examples on every contract change — stale examples silently override new instructions.
 
 ## Regression Set Design
 
-Structure (30–50 cases to start, grown from production):
+Start with cases sufficient to reproduce the observed failure. Grow coverage according to risk, prevalence, and the uncertainty needed for the release decision; no fixed count guarantees detection of most regressions.
 
-| Slice | Share | Contents |
-|---|---|---|
-| Common cases | ~40% | The head of real traffic |
-| Prior failures | ~25% | Every production bug becomes a case |
-| Edge/formatting | ~15% | Empty, huge, malformed, mixed-language inputs |
-| Adversarial | ~10% | Injection attempts via user text and via documents |
-| Abstention | ~10% | Cases where the right answer is "insufficient evidence" |
+Separate development cases, selection/validation cases, protected release cases, and regression/challenge cases. Compare baseline and candidate on the same versioned snapshot. Sample representative traffic and report targeted stress tests separately instead of assigning a universal fixed mixture.
+
+Include common requests, known failures, empty/large/malformed inputs, missing or conflicting evidence, injection via documents or tool results, and appropriate abstention. Correct erroneous labels with an audit trail. Read [failure-first-measurement.md](failure-first-measurement.md) for confidence bounds, repeated reliability, and gates.
 
 Graders per case: schema validity (deterministic), required/forbidden content checks, and rubric judges only where code can't decide (see `advise-eval`). Gate: no critical-slice regressions, target-metric improvement on the slice the change aimed at.
 
