@@ -143,6 +143,9 @@ def main() -> int:
                         f"{ref.relative_to(REPO)}: {ref_words} words (target 300-1,500)"
                     )
 
+        if not (refs_dir / "source-map.md").exists():
+            errors.append(f"{rel}: missing references/source-map.md")
+
         oai = skill_dir / "agents" / "openai.yaml"
         if not oai.exists():
             errors.append(f"{rel}: missing agents/openai.yaml")

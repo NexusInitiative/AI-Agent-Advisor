@@ -178,6 +178,9 @@ Each skill's `references/` directory must include a `source-map.md`: a table lin
 **Rules:**
 - **Verify every URL before committing.** Fetch it. Check that the page or paper is actually about what the claim says. A hallucinated or mismatched citation is worse than no citation — it launders a guess into "research."
 - Cite primary sources: original papers, official docs, first-party engineering posts. Blog summaries of papers don't count.
+- **Every claim, number, and threshold needs a source.** Do not state a fixed dataset size, percentage cutoff, latency, or cost multiplier unless a cited source reports it; otherwise tell the reader to measure. If you must show example values, label them illustrative.
+- **Label what is not a finding.** Tag mathematical or logical consequences of a cited definition as *(derived)* and workflow steps grounded in cited findings as *(procedure)* in the source map. Name a venue only when the paper itself states one; otherwise call it a preprint. Mark vendor-reported figures as such.
+- **Check figures against the full text, not only the abstract.** Quote the number and scope the paper reports, including the dataset or models it applies to.
 - Keep the claims in `SKILL.md` consistent with the source map. If the skill body names a source, that source must appear in the map.
 - Mark time-sensitive details (pricing, model names, API limits) as version-sensitive in the caveat column, and avoid hardcoding them in the skill body at all.
 - Confidence levels: **High** = primary source directly supports the claim; **Medium** = supported but context-dependent (vendor guidance, single-workload benchmarks, surveys).

@@ -3,7 +3,7 @@
   "owner": {
     "name": "NexusInitiative"
   },
-  "description": "Expert advice on building AI agents — covering RAG, multi-agent systems, models, evals, prompting, fine-tuning, context, memory, caching, embeddings, vector databases, and agent harnesses.",
+  "description": "Expert advice on building AI agents — covering RAG, multi-agent systems, models, evals, prompting, fine-tuning, context, memory, caching, embeddings, vector databases, agent harnesses, and debugging wrong AI answers.",
   "version": "1.0.0",
   "plugins": [
     {

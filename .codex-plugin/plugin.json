@@ -1,7 +1,7 @@
 {
   "name": "ai-advisor",
   "version": "1.0.0",
-  "description": "Expert advice on building AI agents — covering RAG, multi-agent systems, models, evals, prompting, fine-tuning, context, memory, caching, embeddings, vector databases, and agent harnesses.",
+  "description": "Expert advice on building AI agents — covering RAG, multi-agent systems, models, evals, prompting, fine-tuning, context, memory, caching, embeddings, vector databases, agent harnesses, and debugging wrong AI answers.",
   "author": {
     "name": "NexusInitiative",
     "url": "https://github.com/NexusInitiative"
@@ -20,12 +20,13 @@
     "./skills/advise-caching",
     "./skills/advise-embedding",
     "./skills/advise-vector-db",
-    "./skills/advise-harness"
+    "./skills/advise-harness",
+    "./skills/advise-debug"
   ],
   "interface": {
     "displayName": "AI Advisor",
     "shortDescription": "Expert advice on building AI agents",
     "category": "development",
-    "capabilities": ["rag", "multi-agent", "evals", "prompting", "fine-tuning", "embeddings", "vector-db"]
+    "capabilities": ["rag", "multi-agent", "evals", "prompting", "fine-tuning", "embeddings", "vector-db", "debugging"]
   }
 }

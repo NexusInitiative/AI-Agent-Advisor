@@ -1,12 +1,12 @@
 # AI Advisor
 
-A senior AI engineer on call in your terminal. Twelve research-backed advisor skills for Claude Code and Codex that turn questions like *"should I fine-tune or use RAG?"* or *"is my LLM judge production-ready?"* into a concrete, opinionated recommendation — not a wall of "it depends."
+A senior AI engineer on call in your terminal. Thirteen research-backed advisor skills for Claude Code and Codex that turn questions like *"should I fine-tune or use RAG?"*, *"is my LLM judge production-ready?"*, or *"why did my fine-tuned model get worse?"* into a concrete, opinionated recommendation — not a wall of "it depends."
 
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg) ![Skills: 12](https://img.shields.io/badge/skills-12-brightgreen.svg) ![Claude Code + Codex](https://img.shields.io/badge/Claude%20Code-%2B%20Codex-8A2BE2.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg) ![Skills: 13](https://img.shields.io/badge/skills-13-brightgreen.svg) ![Claude Code + Codex](https://img.shields.io/badge/Claude%20Code-%2B%20Codex-8A2BE2.svg)
 
 ## How it works
 
-Each skill is a decision-oriented workflow, not an encyclopedia entry. Once installed, skills trigger automatically when your question matches — ask *"my retrieval results are bad"* and the RAG advisor loads itself, asks the right diagnostic questions, and recommends a fix with the trade-off spelled out. Every recommendation is backed by a per-skill source map linking claims to primary research, so you can check the reasoning.
+Each skill is a decision-oriented workflow, not an encyclopedia entry. Once installed, skills trigger automatically when your question matches — ask *"my retrieval results are bad"* and the RAG advisor loads itself, asks the right diagnostic questions, and recommends a fix with the trade-off spelled out. Every recommendation is backed by a per-skill source map linking claims to primary research, with derived and procedural statements labeled and no numeric threshold given without a source, so you can check the reasoning.
 
 ## Example
 
@@ -27,10 +27,12 @@ AI Advisor ›  Then a new embedding model won't fix it. Dense retrieval matches
               embedding-quality gap.
 
               Recommendation: add BM25 (sparse) retrieval and fuse it with your
-              dense results using Reciprocal Rank Fusion (k = 60). Hybrid almost
-              always beats either method alone on mixed queries, and it needs no
-              training. Measure context recall on ~50 real tickets before and
-              after, so the lift is provable rather than assumed.
+              dense results using Reciprocal Rank Fusion (Elastic's default
+              constant is 60). In a published analysis, RRF hybrid beat pure
+              lexical and pure semantic retrieval on most datasets, and it needs
+              no training. Measure candidate recall on a labeled sample of real
+              tickets before and after, so the lift is provable rather than
+              assumed.
 ```
 
 Every skill follows the same pattern: **diagnose first, then give one opinionated recommendation with the trade-off named** — not a list of ten options to figure out yourself.
@@ -64,7 +66,7 @@ gh skill install NexusInitiative/AI-Agent-Advisor advise-rag --agent codex
 | `advise-models` | Model selection and trade-offs | *"which model should I use for this?"* |
 | `advise-multi-agent` | Multi-agent architecture and orchestration | *"should I use multiple agents?"* |
 | `advise-eval` | Evaluation frameworks and LLM-as-judge | *"is my LLM judge production-ready?"* |
-| `advise-prompting` | Prompt engineering techniques | *"why is my prompt being ignored?"* |
+| `advise-prompting` | Failure-first prompt diagnosis and measured improvements | *"why is my prompt being ignored?"* |
 | `advise-fine-tune` | When and how to fine-tune | *"should I fine-tune or prompt-engineer?"* |
 | `advise-context` | Context window management | *"my agent loses track mid-task"* |
 | `advise-memory` | Agent memory patterns | *"my agent keeps forgetting"* |
@@ -72,6 +74,7 @@ gh skill install NexusInitiative/AI-Agent-Advisor advise-rag --agent codex
 | `advise-embedding` | Embedding models and strategies | *"what embedding model should I use?"* |
 | `advise-vector-db` | Vector database selection | *"Pinecone vs Weaviate vs pgvector?"* |
 | `advise-harness` | Agent harness and scaffolding | *"how do I sandbox my agent's tools?"* |
+| `advise-debug` | Debugging wrong AI answers by symptom | *"my fine-tuned model got worse"* |
 
 ## Contributing
 
