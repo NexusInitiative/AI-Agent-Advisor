@@ -1,199 +1,54 @@
 # RAG Evaluation
 
-Evaluation is the part of RAG most teams skip until something goes wrong in production. Set up measurement before you optimize — otherwise you're flying blind.
+Measure each stage separately, because retrieval and generation fail independently and a good final-answer score can hide a broken stage. Sources are in [source-map.md](source-map.md). This file deliberately gives no pass/fail thresholds: none of the cited work establishes a universal cutoff, so compare candidates against your own baseline with uncertainty.
 
----
+## What to measure at each stage
 
-## The Two Layers of RAG Evaluation
-
-RAG has a retrieval component and a generation component. They fail independently and require different metrics. Evaluate both.
-
-```
-Query → [Retrieval] → Retrieved Context → [Generator] → Answer
-          ↑                                    ↑
-   Retrieval metrics                   Generation metrics
-```
-
-A common mistake: good retrieval + bad generation → hallucination. Bad retrieval + good generation → hallucination or refusal. You need to know which component is failing.
-
----
-
-## Retrieval Metrics
-
-### Context Precision
-
-Of the chunks returned in the top-K, what fraction are actually relevant to the query?
-
-- High precision: few irrelevant chunks passed to the generator
-- Low precision: generator has to ignore noise; "Lost in the Middle" effects degrade generation
-
-### Context Recall
-
-Of all relevant chunks in the entire corpus, what fraction were retrieved?
-
-- High recall: the answer exists in the retrieved context
-- Low recall: the answer was in the corpus but wasn't retrieved; generation will hallucinate or refuse
-
-### NDCG (Normalized Discounted Cumulative Gain) and MRR (Mean Reciprocal Rank)
-
-Rank-aware metrics: relevant chunks appearing earlier in the retrieved list score higher than relevant chunks appearing later. Use these when the order of retrieved chunks matters (which it does — see "Lost in the Middle").
-
-### How to Compute Retrieval Metrics
-
-You need relevance judgments: for a set of queries, which chunks are relevant? Options:
-
-1. **Human annotation:** Most accurate; expensive and slow
-2. **Synthetic queries from chunks:** Use an LLM to generate questions that each chunk would answer; use those as your eval set (ARES approach)
-3. **RAGAS context metrics:** Estimate relevance using an LLM judge directly — no human labels required, but introduces LLM judge bias
-
----
-
-## Generation Metrics
-
-### Faithfulness (RAGAS)
-
-Does the generated answer contradict or fabricate information not present in the retrieved context?
-
-- Decompose the answer into individual claims
-- For each claim, check whether it is supported by the retrieved context
-- Faithfulness = supported claims / total claims
-
-This is your primary hallucination metric. Low faithfulness means the model is generating beyond what the context supports.
-
-### Answer Relevance (RAGAS)
-
-Does the generated answer actually address the question asked?
-
-- High answer relevance: the answer directly addresses the query
-- Low answer relevance: the answer is technically faithful but doesn't answer what was asked (common when the generator pivots to something easier to answer from context)
-
-### RAGTruth Hallucination Taxonomy
-
-The RAGTruth corpus (Wu et al., 2024) categorized hallucinations in RAG outputs into three types:
-
-1. **Unsupported additions:** The answer adds facts not present in the retrieved context (most common)
-2. **Contradictions:** The answer directly contradicts the retrieved context
-3. **Numerical errors:** Numbers, dates, or quantities are wrong even when the text is correct
-
-Instrument your eval to specifically track these three patterns. Unsupported additions are often subtle and hard to catch with simple string matching — use an LLM judge with explicit instructions to check for each type.
-
----
-
-## Automated Evaluation Frameworks
-
-### RAGAS
-
-**Paper:** Es et al., "RAGAS: Automated Evaluation of Retrieval Augmented Generation" (2023) — https://arxiv.org/abs/2309.15217
-
-**What it provides:**
-- Faithfulness, Answer Relevance, Context Precision, Context Recall
-- Reference-free: no ground-truth answers required
-- Computes metrics using an LLM judge over the (query, retrieved context, generated answer) triple
-
-**Strengths:** Easy to integrate; widely used; no manual labeling needed for generation metrics  
-**Weaknesses:** Inherits LLM judge biases; metrics are estimates, not ground truth
-
-```python
-from ragas import evaluate
-from ragas.metrics import faithfulness, answer_relevancy, context_precision, context_recall
-
-results = evaluate(dataset, metrics=[faithfulness, answer_relevancy, context_precision, context_recall])
-```
-
-### ARES
-
-**Paper:** Saad-Falcon et al., "ARES: An Automated Evaluation Framework for Retrieval-Augmented Generation Systems" (2023) — https://arxiv.org/abs/2311.09476
-
-**What it provides:**
-- Generates synthetic training data from your corpus
-- Fine-tunes lightweight classifier judges on that synthetic data
-- Produces confidence intervals on evaluation results (statistical rigor RAGAS lacks)
-
-**When to prefer ARES over RAGAS:** When you need statistical confidence on your eval results; when you can invest in building domain-specific synthetic datasets; when you want judges that don't rely on GPT-4.
-
----
-
-## LLM-as-Judge: Benefits and Biases
-
-All automated RAG evaluation ultimately relies on an LLM to judge quality. Know the biases before you trust the scores.
-
-### G-Eval
-
-**Paper:** Liu et al., "G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment" (2023) — https://arxiv.org/abs/2303.16634
-
-G-Eval uses chain-of-thought prompting + form-filling to get GPT-4 to evaluate generated text quality. Key finding: LLM judges correlate better with human judgments when given explicit rubrics and step-by-step evaluation instructions vs. direct scoring.
-
-**How to use G-Eval for RAG:** Define explicit scoring rubrics for each dimension (faithfulness, relevance, completeness). Ask the judge to reason step-by-step before assigning a score. Score on a numeric scale (1–5) rather than binary.
-
-### Known Judge Biases (MT-Bench and Chatbot Arena)
-
-**Paper:** Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (2023) — https://arxiv.org/abs/2306.05685
-
-Key findings:
-- **Position bias:** LLM judges favor responses presented first in pairwise comparison, regardless of quality
-- **Verbosity bias:** Longer responses score higher independent of actual quality or correctness
-- **Self-enhancement bias:** Models tend to rate their own outputs higher
-
-**Mitigations:**
-- Always randomize option order in pairwise evaluations; average scores across both orderings
-- Use reference-anchored scoring (score against a known-good reference) rather than relative pairwise comparison when possible
-- Penalize verbosity explicitly in your rubric: "Do not give higher scores to longer responses unless length is justified by the content"
-- Use rubric-based absolute scoring rather than pairwise preference when you need to track progress over time
-
-### Prometheus 2
-
-**Paper:** Kim et al., "Prometheus: Inducing Fine-grained Evaluation Capability in Language Models" (2023) — https://arxiv.org/abs/2310.08491
-
-Prometheus 2 is an open-source evaluator model fine-tuned specifically for quality assessment using custom rubrics. It achieves near-GPT-4-judge performance without requiring an OpenAI API dependency.
-
-**Use Prometheus 2 when:** You need open-source evaluation (cost, data privacy, or reliability concerns); your rubrics are domain-specific and benefit from a fine-tuned evaluator.
-
----
-
-## Minimum Viable Eval Setup
-
-Before shipping any RAG system:
-
-### Eval Dataset
-- 50–100 representative queries from actual or expected user queries
-- Include edge cases: short factual queries, long analytical queries, queries the corpus can't answer
-- Label expected answers for at least 20–30 of them (for faithfulness calibration)
-
-### Retrieval Eval
-- Run your 50–100 queries through retrieval
-- For each query: rate top-5 retrieved chunks as relevant / not relevant (or use RAGAS context metrics)
-- Record Context Precision and Context Recall
-- Set a baseline; any pipeline change should maintain or improve these
-
-### Generation Eval
-- Run retrieved context + query through your generator for all 50–100 queries
-- Score Faithfulness using RAGAS or manual review of a sample
-- Check for RAGTruth hallucination patterns on failed cases
-
-### Regression Test
-- Run this eval suite on every meaningful change to chunking, retrieval, or generation
-- Track metrics over time; alert on regressions above a threshold (e.g., > 5% drop in faithfulness)
-
----
-
-## Diagnostic Questions When Metrics Are Bad
-
-| Metric | Low Score | Diagnosis |
+| Stage | Question | Notes |
 |---|---|---|
-| Context Precision | < 0.6 | Retrieval returning irrelevant chunks; try hybrid search, better embeddings, reranking |
-| Context Recall | < 0.7 | Relevant content not being retrieved; check chunking, add contextual retrieval |
-| Faithfulness | < 0.8 | Generator hallucinating; add sufficiency check, reduce context noise, shorten chunks |
-| Answer Relevance | < 0.8 | Generator pivoting to easier-to-answer content; check prompt instructions |
+| Candidate retrieval | Is the evidence in the top-N candidates? | Needs labeled evidence; the failure point is FP2 in Barnett et al. |
+| Selection and context assembly | Did the evidence survive reranking and the context budget? | FP3: retrieved but dropped before the generator |
+| Generation | Are claims supported, complete, correctly formatted, and appropriately specific? | FP4 to FP7 |
+| Citation | Were the cited sources supplied, and do they support the claim? | ALCE; Liu et al. |
+| Abstention | When context is insufficient, does the system decline? | Sufficient Context |
+| Whole system | Does the user get the right outcome at acceptable cost and latency? | Report with the counts behind each rate |
 
----
+**Retrieval labels may mislead.** Salemi and Zamani found that evaluating a retriever against query-document relevance labels correlated only weakly with the RAG system's downstream performance. Their eRAG method instead scores each retrieved document by how well the generator answers with it alone, and achieved higher correlation with downstream performance (Kendall's tau improvements of 0.168 to 0.494 over baselines) while using up to 50 times less GPU memory than end-to-end evaluation. Practical reading: supplement relevance judgments with an answer-level check on whether the retrieved set lets the generator succeed.
 
-## Key Papers
+## Hallucination taxonomy: RAGTruth
 
-- **RAGAS**: https://arxiv.org/abs/2309.15217
-- **ARES**: https://arxiv.org/abs/2311.09476
-- **RAGTruth**: https://aclanthology.org/2024.acl-long.585/
-- **G-Eval**: https://arxiv.org/abs/2303.16634
-- **MT-Bench / LLM-as-Judge**: https://arxiv.org/abs/2306.05685
-- **Prometheus 2**: https://arxiv.org/abs/2310.08491
-- **Lost in the Middle**: https://arxiv.org/abs/2307.03172
-- **Sufficient Context**: https://arxiv.org/abs/2411.06037
+RAGTruth (ACL 2024) annotated nearly 18,000 naturally generated RAG responses at word level across question answering, data-to-text writing, and news summarization. It defines four types in two families:
+
+- **Conflict:** *evident conflict* (direct contradiction of the provided information, easily verified, such as clear factual errors, misspelled names, or incorrect numbers) and *subtle conflict* (a departure that alters the contextual meaning, often by substituting terms with different implications or severity).
+- **Baseless information:** *evident introduction of baseless information* (fabricated or hallucinated details lacking support) and *subtle introduction of baseless information* (inferred details, insights, or sentiments that go beyond the provided information and cannot be verified).
+
+Baseless information was significantly more prevalent than conflict, especially in question answering, and the more severe "evident" forms made up a significant portion of both. In its strict RAG setting the authors also labeled true-but-unsupported statements as hallucinations. Instrument for both families, not just contradiction, and decide explicitly whether unsupported-but-true statements count as failures in your product. The paper notes one data-handling pitfall: some models read null values in structured data as false.
+
+## Failure behaviors to test on purpose
+
+- **Noise robustness, negative rejection, information integration, counterfactual robustness.** These are the four abilities the RGB benchmark (AAAI 2024) evaluates; the authors found models showed some noise robustness but struggled significantly with negative rejection, information integration, and false information.
+- **Multi-hop queries.** MultiHop-RAG found existing RAG methods unsatisfactory on them; include multi-hop questions if your users ask them.
+- **Insufficient context.** Sufficient Context found a high share of benchmark instances lacked sufficient context (55.4% on the Musique setup shown), and that models hallucinated more than they abstained.
+- **Conflicting evidence.** ClashEval tested 1,294 questions across six domains with six models and found models adopted incorrect retrieved content, overriding correct prior knowledge, over 60% of the time; adoption fell as the content deviated more from the truth and rose when the model was less confident in its prior.
+- **Noisy or adversarial documents.** Include injected-instruction and poisoned-document cases (see the security step in the main skill).
+
+## Automated frameworks
+
+- **RAGAS** (Es et al., 2023) defines three reference-free metrics: *faithfulness* (claims in the answer inferable from the context), *answer relevance* (the answer addresses the question), and *context relevance* (the context contains only what is needed). It validated them against human judgments on a dataset it introduced (WikiEval). The RAGAS library documents additional metrics; treat library metric definitions as implementation-specific.
+- **ARES** (NAACL 2024) generates synthetic training data, fine-tunes lightweight LM judges for context relevance, answer faithfulness, and answer relevance, and uses prediction-powered inference with a small set of human-annotated points to correct judge errors; the authors report accurate evaluation using only a few hundred human annotations.
+- **RAGChecker** (Ru et al., preprint) provides fine-grained diagnostic metrics for both retrieval and generation modules and reports better correlation with human judgments than other metrics it compared.
+- A survey of RAG evaluation (Yu et al.) catalogs retrieval and generation metrics and benchmark limitations.
+
+All of these rely on LLM judges or learned classifiers, so validate them on a sample of your own outputs rather than treating scores as ground truth.
+
+## LLM-judge cautions
+
+Judges show position, verbosity, and self-enhancement bias and limited reasoning ability (Zheng et al., NeurIPS 2023 Datasets and Benchmarks); position bias varies by judge and by the quality gap between answers (Shi et al.). In the GraphRAG comparison by Han et al., LLM-judged summarization was highly sensitive to the order in which candidate summaries were presented. Swap and average answer order, pin the judge version and rubric, and spot-check disagreements with a human.
+
+## Dataset and sample size
+
+Sample real user questions, add questions the corpus cannot answer, and label expected evidence for a subset so you can score retrieval. Do not use a fixed count as a launch criterion: no cited source establishes one. Instead, report standard errors and use paired comparisons between candidates on the same questions, following Miller's treatment of evaluations as statistical experiments. Keep a protected held-out set; after repeated selection on one set, its estimates stop being valid for the reasons given in the adaptive data-analysis literature.
+
+## Monitoring and regression
+
+Barnett et al. conclude that validation of a RAG system is only feasible in operation and that RAG systems require continuous calibration. Rerun the evaluation after any change to chunking, the embedding model, the index, retrieval parameters, or the generator, and keep per-stage metrics so a regression can be assigned to a stage. When metrics move, look at actual failing examples before changing anything; use `advise-debug` for the symptom-to-fix recipes.

@@ -7,165 +7,97 @@ description: |
   "help me pick a retrieval approach", "why is my RAG hallucinating",
   "when should I use GraphRAG", "how do I evaluate my RAG system",
   "my retrieved chunks aren't relevant", "should I use hybrid search",
-  "how do I reduce RAG hallucinations", or needs guidance on building,
-  improving, or debugging a retrieval-augmented generation system.
+  "do I need RAG or just a long context window", "should I use agentic RAG",
+  or needs guidance on building, improving, or evaluating a retrieval-augmented generation
+  system. When answers are wrong and the failing component is unknown, use advise-debug.
 ---
 
 # RAG Advisor
 
-## Step 1 — Diagnose Before Designing
+**Find the failing stage, fix that stage, and add architecture only for a failure you measured.** RAG systems fail in distinguishable places; a team that cannot say which place has nothing to optimize.
 
-Never recommend an architecture before you understand the problem. Ask or infer:
+## Step 1 — Diagnose before designing
 
-**About the data:**
-- What is the source? (PDFs, code, databases, HTML, mixed formats?)
-- How often does it change? (Static corpus vs. live updates)
-- How large? (Thousands of documents vs. millions of chunks)
-- Is it structured, semi-structured, or free prose?
+Ask or infer:
 
-**About the queries:**
-- Are queries keyword-heavy (product codes, error strings, names) or conceptual ("how does X relate to Y")?
-- Do queries require synthesizing across many documents, or finding a single passage?
-- Are queries short and factual, or long and analytical?
+- **Data:** source formats (PDF, code, HTML, tables), change rate, size, structure.
+- **Queries:** keyword-heavy (codes, error strings, names) or conceptual; one passage or synthesis across documents or hops; short or analytical.
+- **Failure to avoid:** hallucination, missed context, irrelevant retrievals, latency or cost, or leakage between users.
 
-**About the failure mode they most want to avoid:**
-- Hallucination (generating facts not in the source)
-- Missed context (right answer exists but retrieval doesn't surface it)
-- Irrelevant retrievals (retrieval returns chunks that don't help)
-- Latency (retrieval adds too much time)
+Then name the failing stage. A study of three RAG case studies catalogued seven failure points: missing content (FP1), the answer's document not ranked high enough (FP2), retrieved but dropped before the context (FP3), in context but not extracted (FP4), wrong format (FP5), wrong specificity (FP6), and incomplete answers (FP7). Its authors conclude that validation is only feasible in operation and that robustness evolves rather than being designed in, so instrument each stage from the start.
 
-The answers to these questions determine the architecture. Don't skip this step — the biggest RAG mistakes happen when teams choose an architecture before understanding what they're actually building.
+To tell the stages apart, run the same failing questions three ways: closed-book, with human-selected gold evidence, and through your retriever. If gold evidence fixes the answer, the fault is retrieval or selection; if it does not, the fault is generation, the evidence, or the prompt. For symptom-first recipes across all components, use `advise-debug`.
 
----
+## Step 2 — Baseline first, and test whether you need RAG at all
 
-## Step 2 — Start With the Naive RAG Baseline
+Naive RAG, as the Gao et al. survey describes it, indexes chunks, retrieves the top-k by embedding similarity, and generates. Treat chunk size and k as hyperparameters to sweep, not defaults: one best-practices study found 256–512-token chunks scored best on a single-document test, and Anthropic found 20 chunks beat 5 or 10 in its tests and noted that more information can distract the model.
 
-Before adding complexity, establish a working baseline:
+Compare against a long-context baseline. Li et al. found long context outperformed RAG on average when resourced, while RAG cost less; Anthropic suggests a knowledge base under about 200,000 tokens can simply go in the prompt. Choose by measured quality, cost, and freshness, and consider routing (Self-Route cut cost by 39% to 65% at comparable quality). See [architecture-selection.md](references/architecture-selection.md).
 
-1. Chunk your documents (start with fixed-size: 512 tokens, ~10% overlap)
-2. Embed chunks with a general-purpose embedding model
-3. Store in a vector index
-4. At query time: embed the query, retrieve top-5 chunks by cosine similarity, pass to the generator
+## Step 3 — Choose retrieval
 
-This is "Naive RAG" as defined in the Gao et al. survey. It has known weaknesses — poor keyword matching, no retrieval quality check, context ordering problems — but it tells you whether retrieval is even your bottleneck. Most teams skip this and jump to hybrid search and rerankers, then can't tell what's actually helping.
+- **Keyword-heavy queries:** start with BM25. It was a robust zero-shot baseline in BEIR and finds exact strings, such as an error code, that embeddings can miss.
+- **Conceptual queries:** dense retrieval, but note that BEIR found dense and learned-sparse models often underperformed out of domain, and that single-vector embeddings provably cannot return every possible top-k set (Weller et al., ICLR 2026).
+- **Mixed traffic: hybrid.** RRF hybrid beat pure lexical and pure semantic retrieval on most datasets, notably out of domain (Bruch et al.), and adding contextual BM25 to contextual embeddings cut Anthropic's top-20 failure rate from 3.7% to 2.9%. Elastic defaults the RRF constant to 60 and says it needs no tuning, but Bruch et al. found a convex combination tuned on a small labeled set beat RRF on NDCG. Start with RRF, then test a tuned combination once you have labeled queries.
+- **Reranking:** BEIR found re-ranking and late-interaction models best on average at high compute cost; Anthropic's rerank of 150 candidates down to 20 cut failures from 2.9% to 1.9%. Measure the latency you add.
+- **Query transformation:** Wang et al. recommended hybrid search with HyDE as their default retrieval but found query rewriting and decomposition did not help retrieval as much; Ma et al. improved QA with a trained rewriter. Test per query type.
 
-**Run the baseline first. Measure it. Then improve what's actually broken.**
+Details and a fusion sketch: [retrieval-architectures.md](references/retrieval-architectures.md).
 
----
+## Step 4 — Fix chunking and indexing
 
-## Step 3 — Choose a Retrieval Architecture
+- **Chunks lose context.** Contextual Retrieval prepends 50–100 tokens of LLM-written context to each chunk before embedding and BM25 indexing. On Anthropic's mixed-domain tests the top-20 failure rate fell from 5.7% to 3.7% with contextual embeddings, 2.9% with contextual BM25 added, and 1.9% with reranking. Late chunking adds context without LLM calls by embedding the whole document first, but needs a long-context embedding model.
+- **Do not assume semantic chunking pays.** Qu et al. found its extra cost was not justified by consistent gains over fixed-size chunking.
+- **Granularity matters.** Proposition-level units beat passage-level units in dense retrieval (Dense X), and a tree of recursive summaries lifted long-document QA by 20% absolute on QuALITY with GPT-4 (RAPTOR).
+- **Layout-heavy PDFs:** ColPali embeds page images and outperformed text-extraction pipelines on its ViDoRe benchmark.
+- **Carry metadata** (IDs, titles, sections, dates, versions). Barnett et al. found adding file name and chunk number helped; you also need it for filters, citations, and debugging.
 
-Once you have baseline metrics, choose your retrieval approach based on query type:
+Details: [chunking-and-indexing.md](references/chunking-and-indexing.md).
 
-**If queries are keyword-heavy** (error messages, product codes, proper nouns, exact strings):
-- BM25 (sparse retrieval) often outperforms dense retrieval here
-- The BEIR benchmark showed that no single retriever dominates across domains — sparse methods win on keyword-heavy tasks
-- Start with BM25 as a baseline before adding dense retrieval
+## Step 5 — Assemble context and constrain generation
 
-**If queries are conceptual or semantic** ("explain the relationship between X and Y", "what are the implications of Z"):
-- Dense retrieval (DPR-style) wins — it matches meaning rather than tokens
-- Use a strong embedding model; retrieval quality is bottlenecked by embedding quality
+- **More passages is not monotonically better.** With a strong retriever, quality rose and then fell as passages were added, and hard negatives from stronger retrievers could mislead more than those from weaker ones (Jin et al.). Retrieval reordering helped without training.
+- **Position effects.** Accuracy was highest for information at the start or end of the context and lowest in the middle (Lost in the Middle, earlier models); test placement on your model.
+- **Irrelevant context hurts.** Retrieval sometimes lowered accuracy; an NLI filter prevented the drop but discarded relevant passages, while fine-tuning on a mix of relevant and irrelevant contexts made models robust with as few as 1,000 examples (Yoran et al.). RAFT trains the same way with distractor documents.
+- **Add a sufficiency check and permit abstention.** Models often answered rather than abstained when context was insufficient, and adding context reduced abstention; routing with a sufficiency signal raised the correct share of answered questions by 2–10% (Sufficient Context, ICLR 2025).
+- **Retrieved text is not automatically right.** Models overrode their correct prior answers more than 60% of the time when the retrieved content was wrong (ClashEval).
+- **Verify citations.** Check that cited sources were supplied and that they support the claim; audits found 51.5% of sentences fully supported and 74.5% of citations supporting their sentence (Liu et al.).
 
-**For most production systems: use hybrid retrieval**
-- Combine BM25 (sparse) and dense retrieval, then fuse rankings with RRF (Reciprocal Rank Fusion)
-- RRF formula: score = Σ 1/(k + rank_i) where k=60 is standard — no training required
-- Hybrid almost always outperforms either alone across diverse query types
-- This is the default recommendation unless you have strong evidence your queries are uniformly keyword or uniformly semantic
+## Step 6 — Escalate architecture only for a measured failure
 
-See [retrieval-architectures.md](references/retrieval-architectures.md) for detailed comparison of dense, sparse, hybrid, and reranking options.
-
----
-
-## Step 4 — Fix Chunking and Indexing
-
-Chunking strategy has an outsized impact on retrieval quality and is frequently underinvested.
-
-**The key insight from Anthropic's Contextual Retrieval work:** Standard chunking loses context. A chunk that says "The treatment was effective in 73% of cases" is meaningless without knowing what treatment, what condition, what study. Before embedding, prepend a short LLM-generated context summary to each chunk describing what document it came from and where it sits in the document's structure. Anthropic reported a 49% reduction in retrieval failures with this approach.
-
-**Chunking decision tree:**
-- Prose documents (articles, reports, books) → semantic chunking or contextual chunking
-- Code → chunk by function/class boundary, not token count
-- Structured data (tables, JSON) → row-level or entity-level chunks with structured metadata
-- Mixed formats → chunk by document section first, then by token size within sections
-
-**Always add metadata to chunks:** document title, section heading, page number, date, author, document type. This enables filtered retrieval and dramatically improves context assembly.
-
-See [chunking-and-indexing.md](references/chunking-and-indexing.md) for chunking strategy details and trade-offs.
-
----
-
-## Step 5 — Assemble Context Intelligently
-
-Retrieval returning the right chunks is necessary but not sufficient. How you assemble them into the generator's context matters enormously.
-
-**The Lost in the Middle finding:** LLMs systematically underuse information placed in the middle of long contexts. Performance is highest when relevant information is at the beginning or end of the context window. If you're concatenating 10 retrieved chunks, don't put the most relevant one in position 5.
-
-**Ordering strategy:**
-- Put the most relevant chunk first
-- If using reranking, order by reranker score descending
-- For long contexts: most relevant at top, second-most-relevant at bottom, filler in the middle
-
-**Check if retrieved context is actually sufficient before generating.** The Sufficient Context paper frames this as a detection problem: does the retrieved context actually contain an answer? If not, generating will hallucinate. Add a lightweight sufficiency check — either a dedicated classifier or an LLM call asking "does this context contain enough information to answer this question?" — and fall back to a "I don't have enough information" response rather than hallucinating.
-
-**FiD (Fusion-in-Decoder) insight:** When using multiple retrieved passages, generating while attending to all of them simultaneously outperforms feeding them one at a time. Most modern LLMs do this implicitly when you concatenate chunks in the prompt, but the ordering still matters.
-
----
-
-## Step 6 — Escalate to Advanced Patterns Only When Warranted
-
-Advanced RAG patterns add significant complexity. Only use them when the baseline + tuned retrieval is still insufficient.
-
-**Use Self-RAG when:** retrieval quality is inconsistent and you need the model to decide when retrieval helps. Self-RAG trains the model to emit special tokens — retrieve/no-retrieve, and critique tokens (supported/not supported/unsure) — to adaptively retrieve and self-verify. Best for diverse query sets where some queries need retrieval and others don't.
-
-**Use CRAG (Corrective RAG) when:** retrieval confidence is low or the corpus is incomplete. CRAG adds a retrieval quality evaluator; if the score is below a threshold, it falls back to web search or broader retrieval before generating. Particularly useful when your document corpus doesn't cover the full question space.
-
-**Use GraphRAG when:** queries require synthesizing across many documents or understanding relationships between entities. Standard RAG fails on global queries like "what are the main themes across all these reports?" because no single chunk contains the answer. GraphRAG builds an entity-relationship graph and community summaries, enabling queries that require structural understanding. Microsoft's GraphRAG paper demonstrated this on analytical tasks where naive RAG performed near zero. LightRAG is a lighter-weight alternative combining graph and vector retrieval.
-
-**Don't use advanced patterns as a first resort.** Self-RAG requires fine-tuning or strong prompting. CRAG requires a reliable retrieval scorer. GraphRAG requires significant preprocessing cost. Earn complexity by exhausting simpler options first.
-
-See [advanced-patterns.md](references/advanced-patterns.md) for implementation details on each pattern.
-
----
-
-## Step 7 — Evaluate Systematically
-
-You cannot improve what you do not measure. RAG evaluation has two layers: retrieval quality and generation quality.
-
-**Retrieval metrics (measure these first):**
-- Context Precision: of the chunks retrieved, what fraction were actually relevant?
-- Context Recall: of all relevant chunks in the corpus, what fraction were retrieved?
-- NDCG / MRR: rank-aware metrics; relevant chunks should appear early
-
-**Generation metrics:**
-- Faithfulness (RAGAS): does the generated answer contradict or fabricate facts not in the retrieved context? This is your primary hallucination metric.
-- Answer Relevance (RAGAS): does the answer address what was actually asked?
-- RAGTruth patterns: hallucinations in RAG outputs cluster into unsupported additions, contradictions with retrieved context, and numerical errors — instrument specifically for these
-
-**LLM-as-judge caveats (G-Eval, MT-Bench findings):**
-- LLM judges show position bias — they favor responses presented first
-- LLM judges show verbosity bias — longer responses score higher independent of quality
-- Always randomize option order when using LLM judges; use rubric-based scoring (G-Eval style) not pairwise preference
-- For open-source evaluation without GPT-4 API dependency, consider Prometheus 2
-
-**Use RAGAS for automated pipeline evaluation.** It provides reference-free metrics computed only from the question, retrieved context, and generated answer — no ground truth required. Use ARES when you have the capacity to generate synthetic labeled data for a more rigorous framework.
-
-**Minimum eval setup before shipping:**
-1. 50–100 representative questions from your actual user queries
-2. Human-labeled relevance judgments for retrieval eval (or use RAGAS context metrics)
-3. Faithfulness scoring on generated answers
-4. A regression test that runs on every pipeline change
-
-See [evaluation.md](references/evaluation.md) for detailed metric definitions, tooling, and eval dataset construction guidance.
-
----
-
-## Common Failure Modes and Fixes
-
-| Symptom | Likely Cause | Fix |
+| Measured failure | Candidate | Evidence and caveat |
 |---|---|---|
-| Retrieval returns irrelevant chunks | Embedding model too generic | Switch to domain-specific or fine-tuned embeddings; add BM25 hybrid |
-| Right answer exists but isn't retrieved | Chunk context lost during embedding | Add contextual retrieval (Anthropic approach) |
-| Model ignores retrieved context | Relevant chunk buried in middle | Reorder — most relevant first or last |
-| Model generates facts not in context | No sufficiency check; model fills gaps | Add Sufficient Context check before generating |
-| Good retrieval but wrong final answer | Generator doesn't attend to all passages | Check context length; ensure all chunks are within effective attention range |
-| Queries about relationships across documents fail | Single-passage RAG can't do multi-hop | Escalate to GraphRAG or CRAG with web fallback |
+| Retrieval helps only some queries | Adaptive retrieval: Adaptive-RAG, Self-RAG, FLARE | Each reports gains over fixed retrieve-then-read; Self-RAG needs a trained model |
+| Retrieved set wrong or corpus incomplete | CRAG: evaluator picks refine, discard-and-web-search, or both | Needs an evaluator and a search fallback |
+| Multi-hop questions | Iterative retrieval (IRCoT) or graph-indexed HippoRAG | IRCoT gained up to 21 retrieval and 15 QA points; MultiHop-RAG found standard RAG unsatisfactory |
+| Whole-corpus "themes" questions | GraphRAG community summaries | 72–83% LLM-judged win rate on comprehensiveness at ~1M-token corpora; independent studies found no consistent winner and higher prompt cost |
+| Open-ended research needing many searches | Agentic multi-step search | Token use explained 80% of variance in Anthropic's analysis; about 15 times chat tokens |
+
+Do not start here. Details and costs: [advanced-patterns.md](references/advanced-patterns.md).
+
+## Step 7 — Secure the corpus
+
+Enforce permissions at retrieval time, not after generation: OWASP lists inadequate access control and permission-unaware vector stores among vector and embedding weaknesses. Embeddings are not anonymization (92% of 32-token inputs were recovered exactly), a few poisoned documents can steer answers (90% attack success with five injected texts in a corpus of millions), and instructions inside retrieved text can hijack applications. Refer runtime controls to `advise-harness`.
+
+## Step 8 — Evaluate by stage
+
+Measure candidate recall, final-context evidence recall, answer correctness, claim support, citation support, and abstention separately. Conventional retrieval relevance labels correlated weakly with downstream RAG quality (eRAG), so include an answer-level check. RAGTruth classifies hallucinations as conflicts or baseless information, each evident or subtle; baseless information was more common. Stress-test noise robustness, negative rejection, information integration, and counterfactual robustness (RGB). Set sample sizes from uncertainty, not a fixed count. See [evaluation.md](references/evaluation.md).
+
+## Common failures
+
+| Symptom | Likely stage | First fix |
+|---|---|---|
+| Answer exists but is never retrieved | FP2: context lost in chunk, weak first-stage | Contextual retrieval, hybrid, rerank; measure candidate recall |
+| Right chunks retrieved, answer ignores them | FP3/FP4: dropped at selection, or noise and hard negatives | Fewer, better passages; reorder; check selection |
+| Fluent answer with no supporting evidence | FP1 or insufficient context | Sufficiency check and explicit abstention |
+| Answer contradicts the sources | Knowledge conflict or baseless addition | Source gating, claim-level support check |
+| Cross-document questions fail | Multi-hop or global question | Step 6 |
+
+## References
+
+- [retrieval-architectures.md](references/retrieval-architectures.md): sparse, dense, hybrid fusion, reranking, query transformation.
+- [chunking-and-indexing.md](references/chunking-and-indexing.md): chunking evidence, metadata, re-indexing.
+- [advanced-patterns.md](references/advanced-patterns.md): adaptive, corrective, multi-hop, graph, and agentic retrieval.
+- [architecture-selection.md](references/architecture-selection.md): long context versus RAG and the escalation ladder.
+- [evaluation.md](references/evaluation.md): stage-wise metrics, taxonomies, frameworks, sample sizing.
+- [source-map.md](references/source-map.md): every claim above with its source, venue, and scope.

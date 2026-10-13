@@ -1,161 +1,55 @@
 # Advanced RAG Patterns
 
-Only reach for these when the baseline (naive RAG + hybrid retrieval + contextual chunking) is still insufficient. Each pattern adds meaningful complexity — maintenance cost, inference cost, or preprocessing cost. Know why you're adding it before you do.
+Reach for these only when the baseline (naive RAG, hybrid retrieval, contextual chunking, reranking) fails in a way you have measured. Each pattern adds indexing, inference, or training cost. Descriptions follow the papers; results are the authors' own unless stated otherwise. Sources are in [source-map.md](source-map.md).
 
----
+## Adaptive retrieval: decide whether and when to retrieve
 
-## Self-RAG — Adaptive Retrieval and Self-Critique
+**Self-RAG** (Asai et al.) trains one language model to emit reflection tokens so it can retrieve on demand and critique its output. Per the paper the tokens are: *Retrieve* (yes, no, continue), *IsRel* (relevant or irrelevant), *IsSup* (fully supported, partially supported, no support), and *IsUse* (a 1 to 5 usefulness rating). Self-RAG at 7B and 13B outperformed ChatGPT and retrieval-augmented Llama2-chat on open-domain QA, reasoning, and fact-verification tasks, and improved factuality and citation accuracy on long-form generation. It requires training a model; prompting a general model to imitate it is a different, unvalidated method.
 
-**Paper:** Asai et al., "Self-RAG: Learning to Retrieve, Generate, and Critique through Self-Reflection" (2023) — https://arxiv.org/abs/2310.11511
+**Adaptive-RAG** (Jeong et al., NAACL 2024) trains a small classifier to predict query complexity and then chooses between no retrieval, single-step retrieval, and iterative retrieval, reporting better efficiency and accuracy than fixed strategies on open-domain QA.
 
-### What It Does
+**FLARE** (Jiang et al., EMNLP 2023) drafts the upcoming sentence and retrieves again when it contains low-confidence tokens; it targets long-form generation where one up-front retrieval is not enough.
 
-Self-RAG trains (or prompts) the model to emit special reflection tokens during generation:
+**When to use:** queries differ widely in difficulty, or fixed top-k retrieval hurts easy queries. **Skip when:** nearly every query needs the same single retrieval, or you cannot train or host the extra components.
 
-- `[Retrieve]` / `[No Retrieve]` — decides whether retrieval is needed for this query
-- `[ISREL]` / `[ISIRREL]` — judges whether retrieved passages are relevant
-- `[ISSUP]` / `[ISPARTIALLY SUP]` / `[ISNOSUP]` — judges whether the generated statement is supported by the retrieved context
-- `[ISUSE]` / `[ISNOTUSE]` — judges whether the response is useful overall
+## Corrective retrieval: handle bad retrieval explicitly
 
-The model can retrieve multiple times within a single generation, critiquing its own output and retrieving again if needed.
+**CRAG** (Yan et al.) adds a lightweight retrieval evaluator that scores retrieved documents and triggers one of three actions: *Correct* (documents are refined by decomposing them into knowledge strips, filtering, and recomposing), *Incorrect* (documents are discarded and web search supplies replacement knowledge), or *Ambiguous* (a soft combination of both). The paper reports gains when CRAG is plugged into several RAG approaches.
 
-### When to Use
+**When to use:** the corpus is incomplete or retrieval quality is unpredictable and you can use a search fallback. **Skip when:** you cannot call external search, or retrieval is already reliable on your measured set.
 
-- Query set is highly diverse (some queries need retrieval, others don't)
-- Hallucination rate is high and retrieval quality is inconsistent
-- You need fine-grained per-sentence source attribution
-- You have the compute budget for multiple retrieval calls per query
+## Multi-hop questions: retrieval that follows the reasoning
 
-### When Not to Use
+Standard retrieve-then-read struggles when what to retrieve depends on what was already derived. MultiHop-RAG found existing RAG methods unsatisfactory at retrieving and answering multi-hop queries.
 
-- Simple, uniform query sets where retrieval is always needed
-- Latency-sensitive applications (multiple retrieval rounds add significant latency)
-- You don't have the capacity to fine-tune (prompting-only Self-RAG is weaker)
+- **IRCoT** (Trivedi et al., ACL 2023) interleaves retrieval with chain-of-thought steps. With GPT-3 it improved retrieval by up to 21 points and downstream QA by up to 15 points across four datasets, and reduced hallucination in the reasoning.
+- **HippoRAG** (Gutiérrez et al., NeurIPS 2024) indexes with a knowledge graph and Personalized PageRank. It outperformed state-of-the-art methods by up to 20% on multi-hop QA, and single-step HippoRAG matched or beat iterative IRCoT while being 10 to 30 times cheaper and 6 to 13 times faster, per the authors.
 
-### Implementation Path
+## Graph-based retrieval for global questions
 
-1. Start with prompting: instruct the model to explicitly assess whether it needs to retrieve before answering, and to flag any statements it cannot support from the context
-2. If prompting isn't sufficient, fine-tune on Self-RAG training data or generate synthetic training data using the reflection token format
-3. Use a retrieval threshold: only retrieve if the model's self-assessment confidence is below a set value
+**GraphRAG** (Edge et al.) extracts entities and relationships with an LLM, builds a graph, detects communities, summarizes each, and answers global questions from the community summaries. The authors targeted global sensemaking questions over corpora of roughly 1 million tokens. Against vector RAG, global approaches won 72% to 83% of LLM-judged head-to-head comparisons on comprehensiveness (podcast corpus; 72% to 80% on news) and 75% to 82% on diversity (podcast; 62% to 71% news). Empowerment was mixed, and vector RAG gave the most direct answers. The abstract states that conventional RAG fails on global questions; it does not report near-zero baseline scores.
 
----
+**LightRAG** (Guo et al.) combines graph structures with vector retrieval and supports incremental updates. In the authors' comparison on a legal dataset, GraphRAG's retrieval consumed about 610,000 tokens (610 communities of about 1,000 tokens each), against under 100 tokens and one API call for LightRAG. Treat that as self-reported on one dataset.
 
-## CRAG — Corrective Retrieval Augmented Generation
+**Independent evidence is more cautious.**
 
-**Paper:** Yan et al., "Corrective Retrieval Augmented Generation" (2024) — https://arxiv.org/abs/2401.15884
+- Han et al. (a unified comparison of RAG and GraphRAG): there was no consistent winner. RAG did better on single-hop and detail-oriented factual queries; GraphRAG did better on multi-hop, reasoning-heavy questions; community-based global search could sacrifice query-specific details; and LLM-judged summarization comparisons showed strong position effects.
+- GraphRAG-Bench (Xiang et al., ICLR 2026): RAG excelled at discrete facts for simple questions, GraphRAG's advantages emerged as questions grew more complex, and GraphRAG significantly increased prompt length.
 
-### What It Does
+**Use graph retrieval when** questions are global or multi-hop and your measured baseline fails on them. **Avoid it for** single-passage factual lookup, frequently changing corpora (graph maintenance), or small budgets.
 
-CRAG adds a retrieval evaluator between retrieval and generation:
+## Agentic and trained multi-step search
 
-1. Retrieve candidates as normal
-2. Score each retrieved document with a lightweight evaluator (fine-tuned classifier or LLM call)
-3. If score is **high** → use retrieved documents
-4. If score is **low** → discard retrieved documents, fall back to web search (or broader corpus search)
-5. If score is **ambiguous** → decompose the query, search for sub-questions, combine results
+- **Anthropic's multi-agent research system** replaces static retrieval with dynamic multi-step search. In Anthropic's analysis, token usage alone explained 80% of the variance in BrowseComp performance, agents used about 4 times the tokens of a chat, and multi-agent systems about 15 times. It is economical only for tasks valuable enough to pay for that.
+- **Search-R1** (Jin et al.) trains a model with reinforcement learning to issue multiple searches during reasoning, improving results by 41% (Qwen2.5-7B) and 20% (Qwen2.5-3B) over RAG baselines under the same setting. It requires RL training infrastructure.
+- A 2025 survey of agentic RAG offers a taxonomy and lists open challenges in evaluation, coordination, memory, efficiency, and governance.
 
-The key insight: bad retrieval actively hurts generation. It's better to acknowledge uncertainty than to generate from irrelevant context. "Lost in the Middle" and Sufficient Context both validate this — irrelevant context degrades generation quality, it doesn't just add noise.
-
-### When to Use
-
-- Your document corpus is incomplete — some queries will find no good answer in it
-- Retrieval quality is inconsistent and hard to predict at query time
-- You have access to a web search API as a fallback (Bing, Google, Brave Search)
-- Hallucination rate is high even with good-looking retrieved context
-
-### When Not to Use
-
-- You cannot use web search (data sovereignty, air-gapped environments)
-- Your corpus is comprehensive and well-indexed — the evaluator overhead isn't worth it
-- Latency constraints are tight (evaluator + conditional web search adds time)
-
-### Implementation Notes
-
-- The retrieval evaluator can be a fine-tuned classifier (cheap at inference), a cross-encoder relevance score, or an LLM call ("Does this passage contain enough information to answer: [query]?")
-- Web search fallback: retrieve the top web result, extract relevant passages, combine with any usable corpus passages before generating
-- Use CRAG's knowledge refinement step: strip irrelevant sentences from retrieved documents before passing to the generator (reduces noise)
-
----
-
-## GraphRAG — Graph-Based Retrieval for Multi-Hop and Global Queries
-
-**Papers:**
-- Microsoft GraphRAG: Edge et al., "From Local to Global: A Graph RAG Approach to Query-Focused Summarization" (2024) — https://arxiv.org/abs/2404.16130
-- LightRAG: He et al., "LightRAG: Simple and Fast Retrieval-Augmented Generation" (2024) — https://arxiv.org/abs/2410.05779
-
-### The Problem Standard RAG Can't Solve
-
-Standard RAG retrieves individual passages. It fails when:
-- The answer requires synthesizing across dozens of documents ("What are the key themes in these 500 customer complaints?")
-- The query requires multi-hop reasoning ("Who reported to the person who signed the Q3 financial report?")
-- The relevant information is distributed across the corpus with no single authoritative passage
-
-### What GraphRAG Does
-
-1. **Entity and relationship extraction:** Use an LLM to extract entities (people, places, concepts, events) and their relationships from all documents
-2. **Graph construction:** Build a knowledge graph where nodes are entities and edges are relationships
-3. **Community detection:** Cluster the graph into communities (related groups of entities) using algorithms like Leiden
-4. **Community summaries:** Generate a summary for each community using an LLM
-5. **Query routing:** For global queries, retrieve and synthesize community summaries. For local queries, use graph-traversal to find relevant entity neighborhoods, then retrieve associated passages
-
-Microsoft's paper showed near-zero performance for standard RAG on global sensemaking queries where GraphRAG performed well.
-
-### LightRAG as a Lighter Alternative
-
-LightRAG combines graph indexing with vector retrieval in a simpler architecture:
-- Extracts entities and relationships during indexing
-- Stores them in both a graph structure and a vector index
-- At query time: dual retrieval from both the graph and vector store, combined before generation
-- Significantly lower preprocessing and query cost than full Microsoft GraphRAG
-
-**Use LightRAG when:** You need graph-aware retrieval but can't afford GraphRAG's preprocessing cost (LLM calls over all documents for entity extraction and community summarization are expensive).
-
-### When to Use GraphRAG
-
-- Analytical queries over a large corpus ("summarize the main arguments across these documents")
-- Knowledge graph-style queries ("what is the relationship between X and Y?")
-- Multi-hop reasoning chains required
-- Your users need to understand how documents relate, not just retrieve facts from them
-
-### When Not to Use GraphRAG
-
-- Your queries are factual and local (single-passage answers)
-- Your corpus changes frequently (graph must be rebuilt on updates)
-- You have a small corpus (< a few hundred documents) — overhead not justified
-- Budget is constrained (entity extraction + community summarization requires many LLM calls at indexing time)
-
----
+Use these for open-ended research where fixed pipelines demonstrably fail, and budget for tokens, latency, and evaluation of multi-step behavior. See `advise-multi-agent` for orchestration.
 
 ## Fusion-in-Decoder (FiD)
 
-**Paper:** Izacard & Grave, "Leveraging Passage Retrieval with Generative Models for Open Domain Question Answering" (2020) — https://arxiv.org/abs/2007.01282
+Izacard and Grave's FiD encodes each retrieved passage separately with the question and lets the decoder attend over all of them. It obtained state-of-the-art results on Natural Questions and TriviaQA at the time, and its performance improved significantly as the number of retrieved passages increased, which the authors read as evidence that generative models can aggregate evidence across passages. Jin et al. later found that for long-context LLMs quality first rose and then fell as passages were added, so the response to passage count depends on the model and the retriever; measure it for yours (Step 5 of the main skill).
 
-### What It Does
+## Escalation path
 
-FiD modifies the generator to encode each retrieved passage independently with the query, then concatenates the encoder representations before decoding. The decoder attends to all passage encodings simultaneously.
-
-This differs from standard RAG where all passages are concatenated into a single long input string. FiD outperformed concatenation approaches on Natural Questions and TriviaQA benchmarks.
-
-### Relevance to Modern LLMs
-
-FiD was designed for encoder-decoder architectures (T5-style). Modern decoder-only LLMs already attend to all tokens in the concatenated context. The practical lesson: concatenate retrieved chunks into the context rather than processing them sequentially, and order them with the most relevant first (per the "Lost in the Middle" finding).
-
----
-
-## The Naive → Advanced Escalation Path
-
-```
-Naive RAG (baseline)
-  ↓ if: retrieval quality is low for keyword queries
-Hybrid retrieval + RRF
-  ↓ if: chunks lack context
-Contextual chunking (Anthropic approach)
-  ↓ if: query needs synthesis across many docs
-GraphRAG or LightRAG
-  ↓ if: retrieval confidence is inconsistent or corpus is incomplete
-CRAG with web fallback
-  ↓ if: need per-statement attribution or selective retrieval
-Self-RAG
-```
-
-Each step should be justified by a measured failure in the previous step.
+Naive RAG, then hybrid and contextual chunking, then reranking, then the pattern that matches the measured failure (adaptive for variable need, corrective for unreliable retrieval, iterative or graph for multi-hop, graph for global, agentic for open-ended research). Justify each step with a failure in the previous one, and confirm the gain on held-out questions. A selection guide with costs is in [architecture-selection.md](architecture-selection.md).

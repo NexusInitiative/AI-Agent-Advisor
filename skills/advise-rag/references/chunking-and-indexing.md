@@ -1,118 +1,58 @@
 # Chunking and Indexing
 
-## Why Chunking Matters More Than Most Teams Think
+Chunking decides what the embedding model and the generator can see. A chunk that lacks context cannot be repaired downstream. Claims here are sourced in [source-map.md](source-map.md); items marked *(heuristic)* are design heuristics, not benchmarked results.
 
-The embedding model encodes a fixed-size vector for each chunk. If a chunk lacks sufficient context to be meaningfully embedded, no retrieval architecture can save you. Chunking is often treated as a preprocessing detail — it's actually a core architectural decision.
+## Chunk size and overlap are hyperparameters
 
----
+Wang et al. varied chunk size on one document (the first sixty pages of a Lyft annual report), with about 170 LLM-generated queries and LLM-computed faithfulness and relevancy. Scores were highest at 256 and 512 tokens, lower at 128 and 1024, and lowest at 2048, with a 20-token overlap. That is one small test, so read it as evidence that size matters and that mid-sized chunks are a reasonable first sweep, not as a rule. Larger chunks carry more context but cost more processing; smaller chunks can raise recall but lack context (the authors' own framing).
 
-## Chunking Strategies
+Sweep size and overlap on your corpus using candidate recall and final answer quality.
 
-### Fixed-Size Chunking
+## Strategies and what the evidence says
 
-Split documents into chunks of N tokens with M tokens of overlap between consecutive chunks.
+| Strategy | What it does | Evidence |
+|---|---|---|
+| Fixed-size | Splits into equal token spans, usually with overlap | Qu et al. found the extra cost of semantic chunking was not justified by consistent gains over fixed-size chunking on retrieval and answer-generation tasks |
+| Semantic | Splits at sentence or topic boundaries, sometimes using embedding similarity | Same study; keep it only if it wins on your data |
+| Contextual (prepend context) | An LLM writes 50–100 tokens situating each chunk in its document; prepended before embedding and BM25 indexing | Anthropic: top-20 failure rate 5.7% to 3.7% (embeddings), 2.9% (with BM25), 1.9% (with reranking), averaged over codebases, fiction, ArXiv and science papers, on one embedding configuration |
+| Late chunking | Embeds the full document with a long-context embedding model, then pools token vectors per chunk | Günther et al.: chunk embeddings capture surrounding context without LLM calls and improved retrieval across tasks; requires a long-context embedding model |
+| Proposition-level | Indexes atomic, self-contained factual statements | Dense X: fine-grained units outperformed passages in dense retrieval, and fine-grained prompts improved QA at a fixed budget |
+| Hierarchical summaries | Recursively clusters and summarizes chunks into a tree; retrieves across levels | RAPTOR: +20% absolute on QuALITY with GPT-4; on tasks needing whole-document understanding |
 
-- **Default parameters:** 512 tokens, ~50 tokens overlap (≈10%)
-- **Pros:** Simple, fast, predictable chunk count, easy to reason about
-- **Cons:** Splits mid-sentence, mid-paragraph, or mid-table; loses structural context
-- **Use when:** Getting started, testing baseline performance, structured data with consistent density
+**Cost of contextual chunking.** Anthropic estimated $1.02 per million document tokens with prompt caching, under stated assumptions (800-token chunks, 8k-token documents, 100 tokens of context per chunk). The cost is paid at indexing time, not at query time. Recompute it with your own sizes and current prices.
 
-### Semantic Chunking
+## Structure-aware splitting *(heuristic)*
 
-Split at natural semantic boundaries: sentence breaks, paragraph breaks, section headers. Optionally use an embedding similarity threshold to merge or split segments.
+When a query refers to a unit that fixed windows cut apart (a function, a table row, a numbered clause), split on that unit and keep its header with it. This preserves the unit the user asks about; it has not been benchmarked here, so compare it with fixed-size chunking on your queries, as Qu et al. did for semantic chunking.
 
-- **Pros:** Chunks correspond to coherent ideas, better for embedding quality
-- **Cons:** Variable chunk size complicates indexing; slower preprocessing
-- **Use when:** Prose-heavy documents (reports, articles, books), where paragraph structure reflects semantic units
+For layout-heavy PDFs where tables and figures carry the answer, compare your text-extraction pipeline with page-image retrieval (ColPali, ICLR 2025), which outperformed text-extraction pipelines on its benchmark.
 
-### Hierarchical / Multi-Granularity Chunking
+## Metadata
 
-Index chunks at multiple granularities: sentence-level, paragraph-level, document-level. Retrieve at fine granularity, but return the surrounding parent chunk for context.
+Store with every chunk: a stable chunk ID, document ID and version, title, section path, page or position, and a timestamp. Uses:
 
-- **Pros:** Retrieval precision at sentence level, generation context at paragraph level
-- **Cons:** Larger index, more complex retrieval pipeline
-- **Use when:** Users ask pinpoint questions but need surrounding context to generate good answers ("what was the Q3 revenue?" in a financial report)
+- **Retrieval and reading.** Barnett et al. report that adding metadata such as file name and chunk number to the retrieved context helped the reader.
+- **Citation checking.** You can confirm that a cited ID was actually supplied.
+- **Debugging.** A bad answer can be traced to the chunk, document version, and index build that produced it.
+- **Filtering and permissions.** Apply tenant and access filters at query time, before generation (see `advise-harness`).
 
-### Contextual Chunking (Anthropic Approach)
-
-Before embedding, prepend a short context description to each chunk using an LLM call:
-
-```
-Context: This chunk is from a 2023 annual report for Acme Corp, in the section
-"Q3 Financial Results." It describes quarterly revenue breakdown by product line.
-
-[original chunk text follows]
-```
-
-Anthropic's contextual retrieval engineering post reported a 49% reduction in retrieval failures using this technique, and further gains when combined with BM25. The LLM-generated context anchors the chunk to its document-level meaning, preventing the common failure where a chunk that's meaningful in context becomes meaningless in isolation.
-
-**Cost:** One LLM call per chunk at indexing time. Use prompt caching to reduce cost when re-indexing overlapping document sets. At indexing time this is acceptable; the cost does not affect query latency.
-
-### Document-Specific Strategies
-
-| Document Type | Recommended Strategy |
-|---|---|
-| Long prose (reports, books) | Semantic or contextual chunking by paragraph/section |
-| Code | Chunk by function, class, or method — never by token count |
-| Tables / structured data | One row or entity per chunk; embed column headers with each row |
-| HTML / web pages | Strip boilerplate first; chunk by `<p>` or `<section>` tags |
-| PDFs | Extract text with layout awareness; chunk by visual section |
-| Emails / short docs | Entire document as one chunk; no splitting needed |
-| Mixed corpora | Detect document type; apply strategy per type |
-
----
-
-## Metadata: The Underused Multiplier
-
-Every chunk should carry structured metadata alongside its text. Metadata enables:
-- **Filtered retrieval:** "Only search within documents published after 2023"
-- **Citation:** Surface the source document, section, and page in the generated response
-- **Reranking signals:** Use metadata features as additional scoring signals
-- **Debugging:** Trace retrieved chunks back to their source when diagnosing failures
-
-**Minimum metadata per chunk:**
 ```json
 {
+  "chunk_id": "annual-report-2023-acme#p14-c3",
   "doc_id": "annual-report-2023-acme",
-  "doc_title": "Acme Corp Annual Report 2023",
+  "doc_version": "2023-11-01",
   "section": "Q3 Financial Results",
   "page": 14,
-  "chunk_index": 3,
-  "created_at": "2023-11-01"
+  "index_build": "2026-10-01"
 }
 ```
 
-Add domain-specific metadata as needed: author, category, product line, jurisdiction, language, confidence score.
+## Index design
 
----
+Choosing an ANN index type, tuning recall against latency, and sizing a vector store are covered by `advise-vector-db`. In RAG terms, two points matter: measure whether approximate search is losing relevant chunks (compare against exact search on a sample), and test filtered queries separately from unfiltered ones.
 
-## Index Design
+## Re-indexing and versioning
 
-### Vector Index Options
-
-| Index Type | Scale | Recall | Speed | Notes |
-|---|---|---|---|---|
-| Flat (exact) | <1M chunks | 100% | Slow at scale | Good for dev/testing |
-| HNSW | 1M–100M | 95–99% | Fast | Default for most systems (used in pgvector, Weaviate, Qdrant) |
-| IVF | >10M | 90–98% | Tunable | Requires training; good for very large corpora |
-| ScaNN | >100M | 97–99% | Very fast | Google's production-grade ANN |
-
-### Hybrid Index Setup
-
-Run a separate BM25 index (Elasticsearch, OpenSearch, or BM25s) alongside your vector index. At query time, retrieve from both, fuse with RRF. Most vector databases (Weaviate, Qdrant, Elasticsearch) now offer built-in hybrid search — use native hybrid if available to avoid maintaining two separate systems.
-
-### Re-indexing Strategy
-
-Plan for re-indexing from the start:
-- Keep your raw documents and chunking pipeline separate from your index
-- Version your embedding model — changing models invalidates all existing embeddings
-- Use incremental indexing for live corpora; avoid full re-index on every update
-- Store original document text alongside embeddings so you can re-chunk without re-fetching source data
-
----
-
-## Key References
-
-- **Anthropic Contextual Retrieval**: https://www.anthropic.com/engineering/contextual-retrieval
-- **RAG Survey (Gao et al.)** — Section 3 on Advanced RAG indexing strategies: https://arxiv.org/abs/2312.10997
-- **Original RAG paper (Lewis et al., 2020)**: https://arxiv.org/abs/2005.11401
+- Keep raw documents and the chunking pipeline separate from the index, and store original text with each chunk so you can re-chunk without re-fetching.
+- Version the embedding model with the index. Features from different models are not interchangeable unless trained for compatibility; the backward-compatible training paper (CVPR 2020, image-retrieval features) exists precisely because upgrading a model otherwise forces recomputing every stored vector ("backfilling").
+- Barnett et al. report that RAG systems require continuous calibration; rerun your evaluation set after every change to chunking, the embedding model, or the index, and keep the previous build available for rollback.

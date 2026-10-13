@@ -1,99 +1,64 @@
 # Retrieval Architectures
 
-## Sparse Retrieval (BM25)
+Every statement here is tied to a source in [source-map.md](source-map.md). Where evidence is vendor-reported or comes from a single benchmark, the text says so. None of it replaces measuring on your own queries.
 
-BM25 is a term-frequency / inverse-document-frequency ranking function. It scores chunks based on exact token overlap with the query.
+## Sparse retrieval (BM25)
 
-**Strengths:**
-- Excellent on keyword-heavy queries: error codes, product identifiers, proper nouns, technical terms
-- No training required; fast and cheap to run
-- Highly interpretable — you can see exactly which tokens drove the score
-- Generalizes well across domains without fine-tuning (validated by BEIR benchmark)
+BM25 scores documents by lexical overlap with the query, adjusted for term frequency and document length. In BEIR, an 18-dataset zero-shot benchmark, BM25 was a robust baseline. Anthropic's illustration of why it still matters: a query for an exact error code such as "TS-999" can be matched literally by BM25 while an embedding model may surface content about error codes in general.
 
-**Weaknesses:**
-- Vocabulary mismatch: "cardiac arrest" doesn't match "heart attack"
-- No semantic understanding: can't handle paraphrase or conceptual queries
-- Sensitive to typos and abbreviations
+Its limit is vocabulary mismatch: a query and a document that use different words for the same idea will not overlap lexically.
 
-**When to use as your primary retriever:** Your queries are dominated by exact-match needs (log file search, code search, product catalog lookup, legal citation retrieval).
+**Use as a primary retriever** when queries are dominated by exact strings (identifiers, error codes, names, citations). **Always keep it as a baseline** so you can tell whether a dense or hybrid upgrade is actually helping.
 
----
+## Dense retrieval
 
-## Dense Retrieval (DPR and descendants)
+Dense Passage Retrieval (Karpukhin et al., EMNLP 2020) encodes queries and passages into vectors with a bi-encoder and retrieves by vector similarity. It matches meaning across different wording. Two measured limits:
 
-Dense Passage Retrieval (Karpukhin et al., 2020) uses a bi-encoder: one encoder for the query, one for passages. Both produce fixed-size vectors; retrieval is maximum inner product search (MIPS) in that vector space.
+- **Out-of-domain generalization.** BEIR found dense and learned-sparse retrievers were computationally efficient but often underperformed other approaches, highlighting room to improve generalization.
+- **A structural ceiling.** Weller et al. (ICLR 2026) show that the number of distinct top-k document sets a single-vector embedding can return is limited by its dimension, and that even state-of-the-art models fail on LIMIT, a dataset of simple queries built to test this. If relevance is combinatorial (many documents jointly relevant to arbitrary query combinations), single-vector retrieval can fail regardless of training data.
 
-**Strengths:**
-- Handles semantic similarity: "cardiac arrest" matches "heart attack"
-- Captures conceptual relationships, not just token overlap
-- Scales well with ANN indexes (FAISS, ScaNN, HNSW)
+Embedding model choice, dimensionality, and evaluation belong to `advise-embedding`.
 
-**Weaknesses:**
-- Fails on rare or out-of-vocabulary terms (product codes, error strings)
-- Embedding quality bottlenecks retrieval quality — a bad embedding model produces bad retrieval
-- BEIR benchmark showed DPR generalizes poorly out-of-domain without fine-tuning
-- More expensive to run than BM25 at large scale
+## Hybrid retrieval and fusion
 
-**When to use:** Queries are primarily conceptual, semantic, or paraphrase-heavy. When query vocabulary doesn't match document vocabulary.
+Run lexical and dense retrieval independently, then fuse. Evidence for doing so:
 
-**Embedding model selection:** General-purpose models (text-embedding-3-small, Cohere embed-v3) work for most use cases. Domain-specific fine-tuning (using hard negatives, contrastive loss) improves recall significantly for specialized corpora (medical, legal, code). Evaluate on your actual query distribution using BEIR-style zero-shot evaluation before committing to a model.
+- Bruch et al. found RRF-based hybrid retrieval outperformed pure-lexical and pure-semantic retrieval on most datasets, and was particularly effective out of domain.
+- Anthropic's Contextual Retrieval tests added BM25 to contextual embeddings and cut the top-20 failure rate from 3.7% to 2.9%.
+- Wang et al. recommended hybrid search (BM25 plus dense) as the efficient default, with HyDE added when latency allows.
 
----
+**Choosing the fusion method.** Reciprocal Rank Fusion scores a document as `sum over retrievers of 1 / (c + rank)`. Elastic documents `rank_constant` (the `c`) with a default of 60 and states that RRF requires no tuning. Bruch et al. report the opposite emphasis: RRF was sensitive to its parameters, a tuned RRF generalized poorly out of domain, and a convex combination of normalized scores (one parameter, tuned on a small labeled set) significantly outperformed RRF on NDCG on every dataset they tested. Practical reading: begin with RRF because it needs no labels; once you have a small labeled set (Bruch et al. report the convex combination is sample efficient), compare it with a tuned convex combination on held-out queries.
 
-## Hybrid Retrieval + RRF
-
-The practical default for most production RAG systems. Run BM25 and dense retrieval independently, then fuse their ranked lists.
-
-**Reciprocal Rank Fusion (RRF)** is the standard fusion method (Cormack et al., 2009):
-
-```
-RRF_score(d) = Σ 1 / (k + rank_i(d))
-```
-
-Where `k=60` is the standard constant, `rank_i(d)` is the rank of document `d` in retriever `i`'s result list. Documents appearing high in multiple lists get boosted; documents missing from one list get the penalty of a low rank.
-
-**Why RRF works:**
-- Requires no training or score normalization
-- Robust to differences in score distributions between retrievers
-- Consistently outperforms individual retrievers across BEIR tasks
-- Outperforms linear interpolation of scores in most experiments
-
-**Implementation sketch:**
 ```python
-def rrf_fusion(results_list: list[list[str]], k: int = 60) -> dict[str, float]:
-    scores = {}
+def rrf_fusion(results_list: list[list[str]], c: int = 60) -> dict[str, float]:
+    """Reciprocal Rank Fusion. Elastic's documented default for c is 60."""
+    scores: dict[str, float] = {}
     for results in results_list:
-        for rank, doc_id in enumerate(results):
-            scores[doc_id] = scores.get(doc_id, 0) + 1 / (k + rank + 1)
-    return dict(sorted(scores.items(), key=lambda x: x[1], reverse=True))
+        for rank, doc_id in enumerate(results, start=1):
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (c + rank)
+    return dict(sorted(scores.items(), key=lambda kv: kv[1], reverse=True))
 ```
 
-**When hybrid beats single-retriever:** Almost always for diverse query sets. The BEIR benchmark shows that the relative performance of sparse vs. dense retrieval varies dramatically by domain — hybrid with RRF hedges against this uncertainty.
-
----
+Native hybrid search in your vector store avoids running two systems; engine selection is covered by `advise-vector-db`.
 
 ## Reranking
 
-Reranking is a second-stage step applied after initial retrieval. Retrieve 20–50 candidates, then run a cross-encoder reranker to re-score them and keep the top 5.
+A second stage re-scores the top candidates with a model that reads the query and passage together.
 
-**Cross-encoders vs. bi-encoders:**
-- Bi-encoders (used in dense retrieval) encode query and passage independently — fast, parallelizable
-- Cross-encoders encode the query-passage pair together — much more accurate but O(n) latency per candidate
+- BEIR found re-ranking and late-interaction models best on average in zero-shot retrieval, at high computational cost.
+- Anthropic retrieved 150 candidates, reranked them with a Cohere reranker, and passed 20 to the generator; reranking took the failure rate from 2.9% to 1.9%.
+- Wang et al. recommended monoT5 as a comprehensive reranking choice in their comparison.
 
-**When to add a reranker:**
-- Initial retrieval precision is low (irrelevant chunks in top-5)
-- You have budget for the additional latency (~100–300ms for a cross-encoder pass over 20 candidates)
-- Query-passage relevance is nuanced and depends on fine-grained semantic interaction
+Cost is not predictable from a paper: measure added latency and spend on your candidate counts. Compare recall of the evidence in the final context before and after, not only a ranking metric.
 
-**Off-the-shelf rerankers:** Cohere Rerank, Jina Reranker, BGE Reranker, Colbert v2. All work well; evaluate on your data before committing.
+## Late interaction and visual documents
 
-**Contextual compression:** An alternative to reranking — after retrieval, use an LLM to extract only the relevant sentence(s) from each chunk rather than passing the full chunk. Reduces noise in context and token cost. Works well when chunks are large and only partially relevant.
+ColBERT (SIGIR 2020) scores with token-level interaction between query and document vectors. ColPali (ICLR 2025) applies the idea to page images, embedding document pages directly with a vision-language model, and outperformed text-extraction retrieval pipelines on its ViDoRe benchmark. Consider it when tables, figures, and layout carry the answer and OCR or parsing is the weak link. Compare against your parsing pipeline on your documents; the benchmark is the authors' own.
 
----
+## Query transformation
 
-## Key Papers
+- **HyDE** (Gao et al.) has an LLM write a hypothetical answer document, embeds that instead of the query, and retrieves real neighbors; it outperformed an unsupervised dense retriever and approached fine-tuned retrievers across tasks.
+- **Rewrite-Retrieve-Read** (Ma et al., EMNLP 2023) rewrites the query before retrieval and improved open-domain QA, including with a small trained rewriter.
+- In Wang et al.'s comparison, hybrid search with HyDE was recommended, while query rewriting and decomposition did not improve retrieval as much.
 
-- **DPR**: Karpukhin et al., "Dense Passage Retrieval for Open-Domain Question Answering" (2020) — https://arxiv.org/abs/2004.04906
-- **BEIR**: Thakur et al., "BEIR: A Heterogeneous Benchmark for Zero-shot Evaluation of IR Models" (2021) — https://arxiv.org/abs/2104.08663
-- **RRF**: Cormack et al., "Reciprocal Rank Fusion Outperforms Condorcet and Individual Rank Learning Methods" (2009) — https://dl.acm.org/doi/10.1145/1571941.1572114
-- **RAG Survey**: Gao et al., "Retrieval-Augmented Generation for Large Language Models: A Survey" (2023) — https://arxiv.org/abs/2312.10997
+Treat each as a hypothesis for a specific query type, such as vague conversational queries or multi-part questions, and measure candidate recall with and without it.
